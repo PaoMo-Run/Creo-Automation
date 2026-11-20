@@ -1,0 +1,107 @@
+IMPL=c_protoolkit_msvc142_plan_driven
+DOC_TYPE=part
+PART_NAME=turbofan_intake_fan
+NAME_STYLE=chinese_custom
+INIT_ACTIVE_MDL=MMNS_PART_SOLID_ABS
+WIN_INIT win_id=1001 disp_st=0 wg_st=0 wcs_st=0 wact_st=0 cm_st=0 same_mdl=1 tcreate_st=0
+UNITS=millimeter Newton Second (mmNs)
+STEP_TIMER_START st=0
+STEP_TIMER_FIRED
+STEP_CB cur_win=1001 cm_st=0 same_mdl=1 blend_find=0(0000018B5AF43570) ext_find=0(0000018B5AF0D4E8)
+  OPEN_WIN id=1001 mdl_st=0 name=TURBOFAN_INTAKE_FAN
+OP_START idx=0 op=datum_axis id=axis_fan
+OP_START idx=1 op=datum_plane id=pln_blade_root
+OP_START idx=2 op=datum_plane id=pln_bow_axis
+OP_START idx=3 op=datum_axis id=axis_blade_bow
+OP_START idx=4 op=revolve id=fan_hub_spinner
+METRIC[AFTER_HUB_SPINNER] mdl_type=2 bodies=1 def=-5778 bbox=[-113.904..113.904, -113.902..113.909, -540.000..165.163] vol=3753030.1289 area=179568.6372 failed=0 body[0]{id=-5778(DEF),st=4,x=-112..112,y=-111.998..112.006,z=-48.0415..163.259}
+OP_START idx=5 op=chamfer id=hub_chamfers
+EDGE_MATCH[hub_chamfers] rule=0 candidates=38 matched=2
+EDGE_MATCH[hub_chamfers] rule=1 candidates=38 matched=2
+METRIC[AFTER_HUB_CHAMFER] mdl_type=2 bodies=1 def=-5778 bbox=[-113.904..113.904, -113.902..113.909, -540.000..165.163] vol=3751453.8348 area=178326.0982 failed=0 body[0]{id=-5778(DEF),st=4,x=-112..112,y=-111.998..112.005,z=-48.0411..163.259}
+OP_START idx=6 op=extrude id=rear_bolt_hole
+CUT_VOL_REMOVED[rear_bolt_hole]=2659.428961
+METRIC[AFTER_BOLT_HOLE] mdl_type=2 bodies=1 def=-5778 bbox=[-113.904..113.904, -113.902..113.909, -540.000..165.163] vol=3748794.4059 area=179592.5119 failed=0 body[0]{id=-5778(DEF),st=4,x=-112..112,y=-111.998..112.005,z=-48.0411..163.259}
+OP_START idx=7 op=axis_pattern id=rear_bolt_pattern
+METRIC[AFTER_BOLT_PATTERN] mdl_type=2 bodies=1 def=-5778 bbox=[-113.904..113.904, -113.902..113.909, -540.000..165.163] vol=3719526.7016 area=193529.7231 failed=0 body[0]{id=-5778(DEF),st=4,x=-112..112,y=-111.998..112.005,z=-48.0411..163.259}
+OP_START idx=8 op=helical_sweep id=spinner_spiral_groove
+  HLSWP_MACRO_LOAD id=spinner_spiral_groove len=873 st=0 win_id=1001 cur_win=1001
+  MACRO_PICK_REF[spinner_spiral_groove] idx=0 st=0
+  MACRO_SKET[spinner_spiral_groove] idx=0 pop_st=0 set_st=0 shift=(0.000,0.000)
+  MACRO_SKET[spinner_spiral_groove] idx=1 pop_st=0 set_st=0 shift=(-74.167,81.000)
+CUT_VOL_REMOVED[spinner_spiral_groove]=7366.120877
+MACRO_OP_OK[helical_sweep/spinner_spiral_groove] feat_id=502
+METRIC[AFTER_HELICAL_GROOVE] mdl_type=2 bodies=1 def=-5778 bbox=[-113.904..113.904, -113.902..113.909, -540.000..165.163] vol=3712160.5807 area=195675.6031 failed=0 body[0]{id=-5778(DEF),st=4,x=-112..112,y=-111.998..112.005,z=-48.0411..163.259}
+OP_START idx=9 op=rotational_blend id=fan_blade
+  RBLEND_AXIS[fan_blade] p1=(-112.00,82.00,-540.00) p2=(112.00,82.00,-540.00) ref=(65.80,82.00,27.72)
+  RBLEND_SEC_SHIFT[fan_blade] k=1 cum=7.500 shift=(0.0000,-15.3229)
+  RBLEND_SEC_SHIFT[fan_blade] k=2 cum=15.000 shift=(0.0000,-39.6232)
+  RBLEND_SEC_SHIFT[fan_blade] k=3 cum=22.500 shift=(0.0000,-72.4851)
+  RBLEND_MACRO_LOAD id=fan_blade len=1590 st=0 win_id=1001 cur_win=1001
+  MACRO_PICK_REF[fan_blade] idx=0 st=0
+  MACRO_SKET[fan_blade] idx=0 pop_st=0 set_st=0 shift=(0.000,0.000)
+  MACRO_PICK_REF[fan_blade] idx=1 st=0
+  MACRO_SKET[fan_blade] idx=1 pop_st=0 set_st=0 shift=(0.000,-15.323)
+  MACRO_SKET[fan_blade] idx=2 pop_st=0 set_st=0 shift=(0.000,-39.623)
+  MACRO_SKET[fan_blade] idx=3 pop_st=0 set_st=0 shift=(0.000,-72.485)
+MACRO_OP_OK[rotational_blend/fan_blade] feat_id=554
+METRIC[AFTER_SINGLE_BLADE] mdl_type=2 bodies=1 def=-5778 bbox=[-114.595..114.595, -114.593..302.358, -540.000..165.854] vol=3760166.6820 area=224075.7155 failed=0 body[0]{id=-5778(DEF),st=4,x=-112..112,y=-111.998..299.763,z=-59.4732..163.259}
+OP_START idx=10 op=axis_pattern id=fan_blades_pattern
+METRIC[AFTER_BLADE_PATTERN] mdl_type=2 bodies=1 def=-5778 bbox=[-304.231..304.231, -304.146..304.146, -540.000..167.643] vol=4576261.8840 area=706874.2907 failed=0 body[0]{id=-5778(DEF),st=4,x=-299.847..299.847,y=-299.762..299.763,z=-59.4737..163.259}
+OP_START idx=11 op=set_appearance id=app_titanium_base
+APPEAR[app_titanium_base] scope=part matched=153 applied=153 st=0
+OP_START idx=12 op=set_appearance id=app_spinner_carbon
+APPEAR[app_spinner_carbon] scope=surfaces matched=8 applied=8 st=0
+OP_START idx=13 op=set_appearance id=app_spiral_white
+APPEAR[app_spiral_white] scope=features matched=3 applied=3 st=0
+OP_START idx=14 op=set_appearance id=app_fan_blades
+APPEAR[app_fan_blades] scope=features matched=90 applied=90 st=0
+OP_START idx=15 op=set_appearance id=app_rear_hub_gunmetal
+APPEAR[app_rear_hub_gunmetal] scope=surfaces matched=11 applied=11 st=0
+METRIC[FINAL_MODEL] mdl_type=2 bodies=1 def=-5778 bbox=[-304.231..304.231, -304.146..304.146, -540.000..167.643] vol=4576261.8840 area=706874.2907 failed=0 body[0]{id=-5778(DEF),st=4,x=-299.847..299.847,y=-299.762..299.763,z=-59.4737..163.259}
+FEAT[0] id=1 name=RIGHT type=基准平面 status=0
+FEAT[1] id=3 name=TOP type=基准平面 status=0
+FEAT[2] id=5 name=FRONT type=基准平面 status=0
+FEAT[3] id=7 name=PRT_CSYS_DEF type=坐标系 status=0
+FEAT[4] id=40 name=风扇转子中心轴 type=基准轴 status=0
+FEAT[5] id=44 name=叶片叶根起始基准面 type=基准平面 status=0
+FEAT[6] id=46 name=叶片弯曲轴向平面 type=基准平面 status=0
+FEAT[7] id=48 name=叶片展向弯曲轴 type=基准轴 status=0
+FEAT[8] id=52 name=轮毂与整流锥回转体 type=伸出项 status=0
+FEAT[9] id=175 name=轮毂与安装法兰倒角 type=倒角 status=0
+FEAT[10] id=237 name=锁紧螺栓圆周阵列 type=阵列 status=0
+FEAT[11] id=211 name=轮毂锁紧螺栓孔 type=切口 status=0
+FEAT[12] id=238 name= type=切口 status=0
+FEAT[13] id=239 name= type=切口 status=0
+FEAT[14] id=240 name= type=切口 status=0
+FEAT[15] id=241 name= type=切口 status=0
+FEAT[16] id=242 name= type=切口 status=0
+FEAT[17] id=243 name= type=切口 status=0
+FEAT[18] id=244 name= type=切口 status=0
+FEAT[19] id=245 name= type=切口 status=0
+FEAT[20] id=246 name= type=切口 status=0
+FEAT[21] id=247 name= type=切口 status=0
+FEAT[22] id=248 name= type=切口 status=0
+FEAT[23] id=502 name=整流锥螺旋警示导流槽 type=切口 status=0
+FEAT[24] id=601 name=十八叶风扇圆周阵列 type=阵列 status=0
+FEAT[25] id=554 name=宽弦三维扭转风扇叶片 type=伸出项 status=0
+FEAT[26] id=602 name= type=伸出项 status=0
+FEAT[27] id=603 name= type=伸出项 status=0
+FEAT[28] id=604 name= type=伸出项 status=0
+FEAT[29] id=605 name= type=伸出项 status=0
+FEAT[30] id=606 name= type=伸出项 status=0
+FEAT[31] id=607 name= type=伸出项 status=0
+FEAT[32] id=608 name= type=伸出项 status=0
+FEAT[33] id=609 name= type=伸出项 status=0
+FEAT[34] id=610 name= type=伸出项 status=0
+FEAT[35] id=611 name= type=伸出项 status=0
+FEAT[36] id=612 name= type=伸出项 status=0
+FEAT[37] id=613 name= type=伸出项 status=0
+FEAT[38] id=614 name= type=伸出项 status=0
+FEAT[39] id=615 name= type=伸出项 status=0
+FEAT[40] id=616 name= type=伸出项 status=0
+FEAT[41] id=617 name= type=伸出项 status=0
+FEAT[42] id=618 name= type=伸出项 status=0
+FEATURE_COUNT=43
+EXPORTS_COMPLETE=true
+STATUS=OK

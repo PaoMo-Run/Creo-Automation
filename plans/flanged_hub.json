@@ -1,0 +1,149 @@
+{
+  "part_name": "flanged_hub",
+  "template": "mmns_part_solid_abs",
+  "hide_datums_in_views": false,
+  "operations": [
+    {
+      "id": "flange",
+      "op": "extrude",
+      "name_zh": "法兰底座",
+      "plane": "FRONT",
+      "orient_ref": "TOP",
+      "mode": "add",
+      "attach_body": true,
+      "depth_type": "blind",
+      "side": "side_two",
+      "depth": 14.0,
+      "entities_3d": [
+        { "type": "circle", "name": "outer", "center": [0.0, 0.0, 0.0], "radius": 45.0 },
+        { "type": "circle", "name": "bore", "center": [0.0, 0.0, 0.0], "radius": 14.0 }
+      ],
+      "metric_tag": "AFTER_BASE_FLANGE"
+    },
+    {
+      "id": "hub_boss",
+      "op": "revolve",
+      "name_zh": "轴颈旋转台阶",
+      "plane": "RIGHT",
+      "orient_ref": "TOP",
+      "mode": "add",
+      "attach_body": true,
+      "angle": 360.0,
+      "entities_3d": [
+        { "type": "centerline", "name": "axis", "start": [0.0, 0.0, -20.0], "end": [0.0, 0.0, 80.0] },
+        { "type": "line", "name": "l_bot", "start": [0.0, 14.0, 14.0], "end": [0.0, 30.0, 14.0] },
+        {
+          "type": "arc",
+          "name": "fillet",
+          "center": [0.0, 30.0, 20.0],
+          "start": [0.0, 30.0, 14.0],
+          "end": [0.0, 24.0, 20.0],
+          "mid": [0.0, 25.7573593129, 15.7573593129],
+          "radius": 6.0
+        },
+        { "type": "line", "name": "l_od", "start": [0.0, 24.0, 20.0], "end": [0.0, 24.0, 48.0] },
+        { "type": "line", "name": "l_top", "start": [0.0, 24.0, 48.0], "end": [0.0, 14.0, 48.0] },
+        { "type": "line", "name": "l_id", "start": [0.0, 14.0, 48.0], "end": [0.0, 14.0, 14.0] }
+      ],
+      "constraints": [
+        { "type": "same_point", "refs": [{ "entity": "l_bot", "pt": "end" }, { "entity": "fillet", "pt": "start" }] },
+        { "type": "same_point", "refs": [{ "entity": "fillet", "pt": "end" }, { "entity": "l_od", "pt": "start" }] },
+        { "type": "same_point", "refs": [{ "entity": "l_od", "pt": "end" }, { "entity": "l_top", "pt": "start" }] },
+        { "type": "same_point", "refs": [{ "entity": "l_top", "pt": "end" }, { "entity": "l_id", "pt": "start" }] },
+        { "type": "same_point", "refs": [{ "entity": "l_id", "pt": "end" }, { "entity": "l_bot", "pt": "start" }] },
+        { "type": "tangent", "refs": [{ "entity": "l_bot", "pt": "whole" }, { "entity": "fillet", "pt": "whole" }] },
+        { "type": "tangent", "refs": [{ "entity": "fillet", "pt": "whole" }, { "entity": "l_od", "pt": "whole" }] },
+        { "type": "orthogonal", "refs": [{ "entity": "l_od", "pt": "whole" }, { "entity": "l_top", "pt": "whole" }] },
+        { "type": "orthogonal", "refs": [{ "entity": "l_top", "pt": "whole" }, { "entity": "l_id", "pt": "whole" }] },
+        { "type": "orthogonal", "refs": [{ "entity": "l_id", "pt": "whole" }, { "entity": "l_bot", "pt": "whole" }] }
+      ],
+      "dimensions": [
+        { "type": "radius", "refs": [{ "entity": "fillet", "pt": "whole" }], "place_3d": [0.0, 35.0, 17.0] }
+      ],
+      "metric_tag": "AFTER_REVOLVE_HUB"
+    },
+    {
+      "id": "seal_groove",
+      "op": "revolve",
+      "name_zh": "环形密封槽",
+      "plane": "RIGHT",
+      "orient_ref": "TOP",
+      "mode": "cut",
+      "attach_body": true,
+      "angle": 360.0,
+      "entities_3d": [
+        { "type": "centerline", "name": "axis", "start": [0.0, 0.0, -20.0], "end": [0.0, 0.0, 80.0] },
+        { "type": "line", "name": "l1", "start": [0.0, 21.5, 31.5], "end": [0.0, 24.5, 31.5] },
+        { "type": "line", "name": "l2", "start": [0.0, 24.5, 31.5], "end": [0.0, 24.5, 36.5] },
+        { "type": "line", "name": "l3", "start": [0.0, 24.5, 36.5], "end": [0.0, 21.5, 36.5] },
+        { "type": "line", "name": "l4", "start": [0.0, 21.5, 36.5], "end": [0.0, 21.5, 31.5] }
+      ],
+      "constraints": [
+        { "type": "same_point", "refs": [{ "entity": "l1", "pt": "end" }, { "entity": "l2", "pt": "start" }] },
+        { "type": "same_point", "refs": [{ "entity": "l2", "pt": "end" }, { "entity": "l3", "pt": "start" }] },
+        { "type": "same_point", "refs": [{ "entity": "l3", "pt": "end" }, { "entity": "l4", "pt": "start" }] },
+        { "type": "same_point", "refs": [{ "entity": "l4", "pt": "end" }, { "entity": "l1", "pt": "start" }] },
+        { "type": "orthogonal", "refs": [{ "entity": "l1", "pt": "whole" }, { "entity": "l2", "pt": "whole" }] },
+        { "type": "orthogonal", "refs": [{ "entity": "l2", "pt": "whole" }, { "entity": "l3", "pt": "whole" }] },
+        { "type": "orthogonal", "refs": [{ "entity": "l3", "pt": "whole" }, { "entity": "l4", "pt": "whole" }] }
+      ],
+      "metric_tag": "AFTER_REVOLVE_GROOVE"
+    },
+    {
+      "id": "bolt_hole",
+      "op": "extrude",
+      "name_zh": "螺栓孔",
+      "plane": "FRONT",
+      "orient_ref": "TOP",
+      "mode": "cut",
+      "attach_body": true,
+      "depth_type": "blind",
+      "side": "side_two",
+      "depth": 14.0,
+      "entities_3d": [
+        { "type": "circle", "name": "hole", "center": [35.0, 0.0, 0.0], "radius": 4.5 }
+      ],
+      "metric_tag": "AFTER_BOLT_HOLE"
+    },
+    {
+      "id": "bolt_pattern",
+      "op": "axis_pattern",
+      "name_zh": "螺栓孔阵列",
+      "leader": "bolt_hole",
+      "axis": "flange",
+      "count": 4,
+      "increment_deg": 90.0,
+      "metric_tag": "AFTER_BOLT_PATTERN"
+    },
+    {
+      "id": "sweep_curve",
+      "op": "sketched_curve",
+      "name_zh": "扫描轨迹线",
+      "plane": { "plane_at_z": 14.0, "fallback": "FRONT" },
+      "orient_ref": "TOP",
+      "entities_3d": [
+        {
+          "type": "arc",
+          "name": "traj",
+          "center": [0.0, 0.0, 14.0],
+          "start": [33.9865445779, 15.8481856578, 14.0],
+          "end": [15.8481856578, 33.9865445779, 14.0],
+          "mid": [26.5165042945, 26.5165042945, 14.0],
+          "radius": 37.5
+        }
+      ]
+    },
+    {
+      "id": "oil_groove",
+      "op": "sweep",
+      "name_zh": "导油扫描槽",
+      "curve": "sweep_curve",
+      "mode": "cut",
+      "attach_body": true,
+      "entities_2d": [
+        { "type": "circle", "name": "sec", "center": [0.0, 0.0], "radius": 1.8 }
+      ],
+      "metric_tag": "AFTER_SWEEP_GROOVE"
+    }
+  ]
+}

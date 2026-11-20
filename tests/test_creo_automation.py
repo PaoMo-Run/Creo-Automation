@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Unit tests for environment discovery, license parsing, trail checks, and JSON plans."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+if str(ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "scripts"))
+
+import build_cpp
+import creobuild_env
+import install_portable_msvc
+
+
+def _make_mock_creo_tree(root: Path, *, with_sdk: bool = True, psf_license: str = "7788@localhost") -> Path:
+    bin_dir = root / "Parametric" / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    (bin_dir / "parametric.exe").write_bytes(b"MZ")
+    (bin_dir / "parametric.psf").write_text(
+        "// Commented license\n"
+        "// ENV=PTC_D_LICENSE_FILE-=C:\\broken\\ignored.dat\n"
+        f"ENV=PTC_D_LICENSE_FILE-={psf_license}\n",
+        encoding="utf-8",
+    )
+    (root / "Common Files" / "templates").mkdir(parents=True, exist_ok=True)
+    (root / "Common Files" / "templates" / "mmns_part_solid_abs.prt").write_bytes(b"TMPL")
+
+    if with_sdk:
+        inc = root / "Common Files" / "protoolkit" / "includes"
+        obj = root / "Common Files" / "protoolkit" / "x86e_win64" / "obj"
+        unlock_dir = root / "Common Files" / "x86e_win64" / "obj"
+        inc.mkdir(parents=True, exist_ok=True)
+        obj.mkdir(parents=True, exist_ok=True)
+        unlock_dir.mkdir(parents=True, exist_ok=True)
+        (inc / "ProToolkit.h").write_text("#pragma once\n", encoding="utf-8")
+        for lib in ("protk_dll_NU.lib", "ucore.lib", "udata.lib"):
+            (obj / lib).write_bytes(b"LIB")
+        (unlock_dir / "protk_unlock.exe").write_bytes(b"MZ")
+    return root
+
+
+class TestCreoEnvDiscovery(unittest.TestCase):
+    def test_parse_psf_license_variants(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            psf = Path(td) / "parametric.psf"
+            psf.write_text(
+                "// PTC PSF\n"
+                "// ENV=PTC_D_LICENSE_FILE-=C:\\old\\bad.dat\n"
+                "ENV=PTC_D_LICENSE_FILE-=\n"
+                "ENV=LM_LICENSE_FILE=7788@backup-host\n"
+                "ENV=PTC_D_LICENSE_FILE+=7788@primary-host\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(creobuild_env.parse_psf_license(psf), "7788@primary-host")
+
+            psf2 = Path(td) / "lm_only.psf"
+            psf2.write_text("ENV=LM_LICENSE_FILE=7788@lm-host\n", encoding="utf-8")
+            self.assertEqual(creobuild_env.parse_psf_license(psf2), "7788@lm-host")
+
+    def test_is_valid_license_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            dat = Path(td) / "license.dat"
+            dat.write_text("SERVER host ANY 7788\n", encoding="utf-8")
+            self.assertTrue(creobuild_env.is_valid_license_spec(str(dat)))
+            self.assertTrue(creobuild_env.is_valid_license_spec("7788@flex-server"))
+            self.assertFalse(creobuild_env.is_valid_license_spec(str(Path(td) / "missing.dat")))
+            self.assertFalse(creobuild_env.is_valid_license_spec(""))
+
+    def test_inspect_creo_complete_and_missing_sdk(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            creo_ok_dir = _make_mock_creo_tree(Path(td) / "Creo 10.0.2.0", with_sdk=True)
+            info = creobuild_env.inspect_creo_installation(creo_ok_dir, source="test")
+            self.assertTrue(info.creo_ok)
+            self.assertTrue(info.protoolkit_sdk_ok)
+            self.assertTrue(info.license_valid)
+            self.assertEqual(info.major_version, 10)
+            self.assertEqual(info.version, "10.0.2.0")
+
+            creo_no_sdk = _make_mock_creo_tree(Path(td) / "Creo 8.0.0.0", with_sdk=False)
+            info_bad = creobuild_env.inspect_creo_installation(creo_no_sdk, source="test")
+            self.assertTrue(info_bad.creo_ok)
+            self.assertFalse(info_bad.protoolkit_sdk_ok)
+            self.assertTrue(any("reconfigure.exe" in msg for msg in info_bad.issues))
+
+    def test_discover_msvc_portable_and_unicode_path(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td) / "测试 目录" / "Creo-Automation"
+            portable = repo / ".tools" / "portable_msvc"
+            portable.mkdir(parents=True, exist_ok=True)
+            bat = portable / "setup_x64.bat"
+            bat.write_text("@echo off\r\n", encoding="utf-8")
+
+            msvc = creobuild_env.discover_msvc(repo_root=repo, config_path=repo / "none.json")
+            self.assertTrue(msvc.ok)
+            self.assertEqual(msvc.kind, "portable")
+            self.assertEqual(Path(msvc.setup_bat), bat)
+
+            vs_dir = Path(td) / "VS2022"
+            (vs_dir / "VC" / "Auxiliary" / "Build").mkdir(parents=True, exist_ok=True)
+            vcvars_all = vs_dir / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
+            vcvars_all.write_text("@echo off\r\n", encoding="utf-8")
+            msvc_vs = creobuild_env.discover_msvc(explicit_setup=vs_dir, config_path=repo / "none.json")
+            self.assertTrue(msvc_vs.ok)
+            self.assertEqual(msvc_vs.setup_args, ["x64"])
+
+    def test_capture_msvc_env_unicode_and_spaces(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            bat_dir = Path(td) / "测试 空格目录"
+            bat_dir.mkdir(parents=True, exist_ok=True)
+            bat = bat_dir / "setup_x64.bat"
+            bat.write_text(
+                '@echo off\r\nset "CREOBUILD_TEST_VAR=hello_msvc_123"\r\nset "Path=C:\\mock_msvc;%Path%"\r\n',
+                encoding="utf-8",
+            )
+            msvc = creobuild_env.MsvcToolchainInfo(ok=True, kind="portable", setup_bat=str(bat))
+            env = creobuild_env.capture_msvc_env(msvc)
+            self.assertEqual(env.get("CREOBUILD_TEST_VAR"), "hello_msvc_123")
+            path_val = env.get("PATH") or env.get("Path") or ""
+            self.assertTrue(path_val.startswith("C:\\mock_msvc;"))
+
+
+class TestBuildHelpersAndPlans(unittest.TestCase):
+    def test_find_trail_issues_bilingual(self) -> None:
+        sample = (
+            "!MT_CUST - Applied settings\n"
+            "!%CW Sketch contains over-constrained geometry\n"
+            "!%CE Feature regeneration failed\n"
+            "OosEventHandler:: trail file out of sequence\n"
+            "菜单操作 失序\n"
+        )
+        issues = build_cpp.find_trail_issues(sample)
+        self.assertEqual(len(issues), 4)
+        self.assertEqual(build_cpp.find_trail_issues("!MT_CUST - clean trail\n~ Close\n"), [])
+
+    def test_bundled_plans_valid(self) -> None:
+        for fname in ("flanged_hub.json", "turbofan_intake_fan.json"):
+            plan_path = ROOT / "plans" / fname
+            self.assertTrue(plan_path.is_file(), f"Missing plan: {plan_path}")
+            data = json.loads(plan_path.read_text(encoding="utf-8"))
+            self.assertIsInstance(data.get("part_name"), str)
+            self.assertTrue(data["part_name"])
+            self.assertIsInstance(data.get("operations"), list)
+            self.assertGreater(len(data["operations"]), 0)
+
+    def test_setup_check_json_cli(self) -> None:
+        res = subprocess.run(
+            [sys.executable, str(ROOT / "setup.py"), "--check", "--json"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+        )
+        payload = json.loads(res.stdout)
+        self.assertIn("ready", payload)
+        self.assertIn("creo", payload)
+        self.assertIn("msvc", payload)
+        self.assertIn("next_steps", payload)
+
+
+class TestPortableMsvcManifestSelection(unittest.TestCase):
+    def test_select_msvc_packages(self) -> None:
+        manifest = {
+            "packages": [
+                {"id": "Microsoft.VC.14.29.16.11.Tools.HostX64.TargetX64.base", "payloads": [{"url": "u1"}]},
+                {"id": "Microsoft.VC.14.29.16.11.Tools.HostX64.TargetX64.Res.base", "language": "zh-CN", "payloads": [{"url": "u2z"}]},
+                {"id": "Microsoft.VC.14.29.16.11.Tools.HostX64.TargetX64.Res.base", "language": "en-US", "payloads": [{"url": "u2e"}]},
+                {"id": "Microsoft.VC.14.29.16.11.CRT.Headers.base", "payloads": [{"url": "u3"}]},
+                {"id": "Microsoft.VC.14.29.16.11.CRT.x64.Desktop.base", "payloads": [{"url": "u4"}]},
+                {"id": "Microsoft.VC.14.29.16.11.CRT.x64.Store.base", "payloads": [{"url": "u5"}]},
+            ]
+        }
+        ver, pkgs = install_portable_msvc.select_msvc_packages(manifest, preferred_prefix="14.29.16.11")
+        self.assertEqual(ver, "14.29.16.11")
+        self.assertEqual(len(pkgs), 5)
+        self.assertEqual(pkgs[1]["language"], "en-US")
+
+    def test_write_setup_x64_bat(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "VC" / "Tools" / "MSVC" / "14.29.30133").mkdir(parents=True)
+            bat = install_portable_msvc.write_setup_x64_bat(root, "10.0.19041.0")
+            txt = bat.read_text(encoding="utf-8")
+            self.assertIn("%~dp0VC\\Tools\\MSVC\\14.29.30133", txt)
+            self.assertIn("set \"SDK_VER=10.0.19041.0\"", txt)
+
+
+if __name__ == "__main__":
+    unittest.main()

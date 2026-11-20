@@ -1,0 +1,48 @@
+UNITS=millimeter Newton Second (mmNs)
+METRIC[REOPEN_REGEN] mdl_type=2 bodies=1 def=-5778 bbox=[-304.231..304.231, -304.146..304.146, -540.000..167.643] vol=4576261.8840 area=706874.2907 failed=0 body[0]{id=-5778(DEF),st=4,x=-299.847..299.847,y=-299.762..299.763,z=-59.4737..163.259}
+FEAT[0] id=1 name=RIGHT type=基准平面 status=0
+FEAT[1] id=3 name=TOP type=基准平面 status=0
+FEAT[2] id=5 name=FRONT type=基准平面 status=0
+FEAT[3] id=7 name=PRT_CSYS_DEF type=坐标系 status=0
+FEAT[4] id=40 name=风扇转子中心轴 type=基准轴 status=0
+FEAT[5] id=44 name=叶片叶根起始基准面 type=基准平面 status=0
+FEAT[6] id=46 name=叶片弯曲轴向平面 type=基准平面 status=0
+FEAT[7] id=48 name=叶片展向弯曲轴 type=基准轴 status=0
+FEAT[8] id=52 name=轮毂与整流锥回转体 type=伸出项 status=0
+FEAT[9] id=175 name=轮毂与安装法兰倒角 type=倒角 status=0
+FEAT[10] id=237 name=锁紧螺栓圆周阵列 type=阵列 status=0
+FEAT[11] id=211 name=轮毂锁紧螺栓孔 type=切口 status=0
+FEAT[12] id=238 name= type=切口 status=0
+FEAT[13] id=239 name= type=切口 status=0
+FEAT[14] id=240 name= type=切口 status=0
+FEAT[15] id=241 name= type=切口 status=0
+FEAT[16] id=242 name= type=切口 status=0
+FEAT[17] id=243 name= type=切口 status=0
+FEAT[18] id=244 name= type=切口 status=0
+FEAT[19] id=245 name= type=切口 status=0
+FEAT[20] id=246 name= type=切口 status=0
+FEAT[21] id=247 name= type=切口 status=0
+FEAT[22] id=248 name= type=切口 status=0
+FEAT[23] id=502 name=整流锥螺旋警示导流槽 type=切口 status=0
+FEAT[24] id=601 name=十八叶风扇圆周阵列 type=阵列 status=0
+FEAT[25] id=554 name=宽弦三维扭转风扇叶片 type=伸出项 status=0
+FEAT[26] id=602 name= type=伸出项 status=0
+FEAT[27] id=603 name= type=伸出项 status=0
+FEAT[28] id=604 name= type=伸出项 status=0
+FEAT[29] id=605 name= type=伸出项 status=0
+FEAT[30] id=606 name= type=伸出项 status=0
+FEAT[31] id=607 name= type=伸出项 status=0
+FEAT[32] id=608 name= type=伸出项 status=0
+FEAT[33] id=609 name= type=伸出项 status=0
+FEAT[34] id=610 name= type=伸出项 status=0
+FEAT[35] id=611 name= type=伸出项 status=0
+FEAT[36] id=612 name= type=伸出项 status=0
+FEAT[37] id=613 name= type=伸出项 status=0
+FEAT[38] id=614 name= type=伸出项 status=0
+FEAT[39] id=615 name= type=伸出项 status=0
+FEAT[40] id=616 name= type=伸出项 status=0
+FEAT[41] id=617 name= type=伸出项 status=0
+FEAT[42] id=618 name= type=伸出项 status=0
+FEATURE_COUNT=43
+REOPEN_VERIFIED=true
+STATUS=OK

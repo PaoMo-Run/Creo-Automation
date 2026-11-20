@@ -1,0 +1,12 @@
+CreoBuildExec
+CreoBuild AutoModeler (C Pro/TOOLKIT)
+#
+#
+CreoBuild AutoModeler Help
+Run C Pro/TOOLKIT automated modeling
+#
+#
+USER %0s
+%0s
+#
+#

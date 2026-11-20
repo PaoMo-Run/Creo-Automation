@@ -1,0 +1,28 @@
+# Build intermediates and local Creo sandbox artifacts
+build/
+build_cpp/
+output/
+.tools/
+__pycache__/
+*.py[cod]
+*.obj
+*.dll
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.log
+trail.txt*
+*.inf.1
+creobuild.local.json
+
+# Keep showcase preview models & images tracked
+!showcase/
+!showcase/**
+
+# IDE / OS noise
+.vscode/
+.idea/
+.pytest_cache/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1150 @@
+{
+  "part_name": "turbofan_intake_fan",
+  "template": "mmns_part_solid_abs",
+  "hide_datums_in_views": true,
+  "export_right_view": true,
+  "operations": [
+    {
+      "id": "axis_fan",
+      "op": "datum_axis",
+      "name_zh": "风扇转子中心轴",
+      "references": [
+        "TOP",
+        "RIGHT"
+      ]
+    },
+    {
+      "id": "pln_blade_root",
+      "op": "datum_plane",
+      "name_zh": "叶片叶根起始基准面",
+      "mode": "offset",
+      "reference": "TOP",
+      "offset": 82.0,
+      "fit_radius": 100.0
+    },
+    {
+      "id": "pln_bow_axis",
+      "op": "datum_plane",
+      "name_zh": "叶片弯曲轴向平面",
+      "mode": "offset",
+      "reference": "FRONT",
+      "offset": -540.0,
+      "fit_radius": 80.0
+    },
+    {
+      "id": "axis_blade_bow",
+      "op": "datum_axis",
+      "name_zh": "叶片展向弯曲轴",
+      "references": [
+        "pln_blade_root",
+        "pln_bow_axis"
+      ]
+    },
+    {
+      "id": "fan_hub_spinner",
+      "op": "revolve",
+      "name_zh": "轮毂与整流锥回转体",
+      "plane": "RIGHT",
+      "orient_ref": "FRONT",
+      "mode": "add",
+      "attach_body": true,
+      "angle": 360.0,
+      "entities_3d": [
+        {
+          "type": "centerline",
+          "name": "axis",
+          "start": [
+            0.0,
+            0.0,
+            -60.0
+          ],
+          "end": [
+            0.0,
+            0.0,
+            180.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_bore_fwd",
+          "start": [
+            0.0,
+            38.0,
+            -28.0
+          ],
+          "end": [
+            0.0,
+            38.0,
+            50.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_bore_top",
+          "start": [
+            0.0,
+            38.0,
+            50.0
+          ],
+          "end": [
+            0.0,
+            0.0,
+            50.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_cl",
+          "start": [
+            0.0,
+            0.0,
+            50.0
+          ],
+          "end": [
+            0.0,
+            0.0,
+            163.272367
+          ]
+        },
+        {
+          "type": "arc",
+          "name": "arc_nose",
+          "center": [
+            0.0,
+            0.0,
+            144.166667
+          ],
+          "start": [
+            0.0,
+            0.0,
+            163.272367
+          ],
+          "end": [
+            0.0,
+            15.0,
+            156.0
+          ],
+          "mid": [
+            0.0,
+            8.334976,
+            161.358407
+          ],
+          "radius": 19.1057
+        },
+        {
+          "type": "line",
+          "name": "l_cone",
+          "start": [
+            0.0,
+            15.0,
+            156.0
+          ],
+          "end": [
+            0.0,
+            86.0,
+            66.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_slot_a",
+          "start": [
+            0.0,
+            86.0,
+            66.0
+          ],
+          "end": [
+            0.0,
+            84.5,
+            66.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_slot_b",
+          "start": [
+            0.0,
+            84.5,
+            66.0
+          ],
+          "end": [
+            0.0,
+            84.5,
+            64.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_slot_c",
+          "start": [
+            0.0,
+            84.5,
+            64.0
+          ],
+          "end": [
+            0.0,
+            86.0,
+            64.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_drum",
+          "start": [
+            0.0,
+            86.0,
+            64.0
+          ],
+          "end": [
+            0.0,
+            108.0,
+            -34.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_lip_step",
+          "start": [
+            0.0,
+            108.0,
+            -34.0
+          ],
+          "end": [
+            0.0,
+            112.0,
+            -34.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_lip_od",
+          "start": [
+            0.0,
+            112.0,
+            -34.0
+          ],
+          "end": [
+            0.0,
+            112.0,
+            -48.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_aft_face",
+          "start": [
+            0.0,
+            112.0,
+            -48.0
+          ],
+          "end": [
+            0.0,
+            62.0,
+            -48.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_cbore_w",
+          "start": [
+            0.0,
+            62.0,
+            -48.0
+          ],
+          "end": [
+            0.0,
+            62.0,
+            -28.0
+          ]
+        },
+        {
+          "type": "line",
+          "name": "l_cbore_b",
+          "start": [
+            0.0,
+            62.0,
+            -28.0
+          ],
+          "end": [
+            0.0,
+            38.0,
+            -28.0
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_bore_fwd",
+              "pt": "end"
+            },
+            {
+              "entity": "l_bore_top",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_bore_top",
+              "pt": "end"
+            },
+            {
+              "entity": "l_cl",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_cl",
+              "pt": "end"
+            },
+            {
+              "entity": "arc_nose",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "arc_nose",
+              "pt": "end"
+            },
+            {
+              "entity": "l_cone",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_cone",
+              "pt": "end"
+            },
+            {
+              "entity": "l_slot_a",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_slot_a",
+              "pt": "end"
+            },
+            {
+              "entity": "l_slot_b",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_slot_b",
+              "pt": "end"
+            },
+            {
+              "entity": "l_slot_c",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_slot_c",
+              "pt": "end"
+            },
+            {
+              "entity": "l_drum",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_drum",
+              "pt": "end"
+            },
+            {
+              "entity": "l_lip_step",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_lip_step",
+              "pt": "end"
+            },
+            {
+              "entity": "l_lip_od",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_lip_od",
+              "pt": "end"
+            },
+            {
+              "entity": "l_aft_face",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_aft_face",
+              "pt": "end"
+            },
+            {
+              "entity": "l_cbore_w",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_cbore_w",
+              "pt": "end"
+            },
+            {
+              "entity": "l_cbore_b",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "same_point",
+          "refs": [
+            {
+              "entity": "l_cbore_b",
+              "pt": "end"
+            },
+            {
+              "entity": "l_bore_fwd",
+              "pt": "start"
+            }
+          ]
+        },
+        {
+          "type": "tangent",
+          "refs": [
+            {
+              "entity": "arc_nose",
+              "pt": "whole"
+            },
+            {
+              "entity": "l_cone",
+              "pt": "whole"
+            }
+          ]
+        }
+      ],
+      "metric_tag": "AFTER_HUB_SPINNER"
+    },
+    {
+      "id": "hub_chamfers",
+      "op": "chamfer",
+      "name_zh": "轮毂与安装法兰倒角",
+      "d": 1.5,
+      "edge_rules": [
+        {
+          "z_range": [
+            -48.2,
+            -47.8
+          ],
+          "r_range": [
+            111.5,
+            112.5
+          ],
+          "tol": 0.3,
+          "expect_count": 2
+        },
+        {
+          "z_range": [
+            -34.2,
+            -33.8
+          ],
+          "r_range": [
+            111.5,
+            112.5
+          ],
+          "tol": 0.3,
+          "expect_count": 2
+        }
+      ],
+      "metric_tag": "AFTER_HUB_CHAMFER"
+    },
+    {
+      "id": "rear_bolt_hole",
+      "op": "extrude",
+      "name_zh": "轮毂锁紧螺栓孔",
+      "plane": "FRONT",
+      "orient_ref": "TOP",
+      "mode": "cut",
+      "attach_body": true,
+      "depth_type": "through_all",
+      "side": "side_one",
+      "entities_3d": [
+        {
+          "type": "circle",
+          "name": "bolt_c",
+          "center": [
+            0.0,
+            76.0,
+            0.0
+          ],
+          "radius": 4.2
+        }
+      ],
+      "metric_tag": "AFTER_BOLT_HOLE"
+    },
+    {
+      "id": "rear_bolt_pattern",
+      "op": "axis_pattern",
+      "name_zh": "锁紧螺栓圆周阵列",
+      "leader": "rear_bolt_hole",
+      "axis": "axis_fan",
+      "count": 12,
+      "increment_deg": 30.0,
+      "metric_tag": "AFTER_BOLT_PATTERN"
+    },
+    {
+      "id": "spinner_spiral_groove",
+      "op": "helical_sweep",
+      "name_zh": "整流锥螺旋警示导流槽",
+      "plane": "TOP",
+      "pitch": 24.0,
+      "mode": "cut",
+      "handedness": "right",
+      "orientation": "normal",
+      "profile": {
+        "entities_3d": [
+          {
+            "type": "centerline",
+            "name": "cl_z",
+            "start": [
+              0.0,
+              0.0,
+              50.0
+            ],
+            "end": [
+              0.0,
+              0.0,
+              175.0
+            ]
+          },
+          {
+            "type": "line",
+            "name": "traj",
+            "start": [
+              74.166667,
+              0.0,
+              81.0
+            ],
+            "end": [
+              22.1,
+              0.0,
+              147.0
+            ]
+          }
+        ]
+      },
+      "section": {
+        "entities_2d": [
+          {
+            "type": "circle",
+            "name": "flute",
+            "center": [
+              0.0,
+              0.0
+            ],
+            "radius": 2.4
+          }
+        ]
+      },
+      "verify_cut_removed": true,
+      "metric_tag": "AFTER_HELICAL_GROOVE"
+    },
+    {
+      "id": "fan_blade",
+      "op": "rotational_blend",
+      "name_zh": "宽弦三维扭转风扇叶片",
+      "plane": "pln_blade_root",
+      "axis": "axis_blade_bow",
+      "mode": "add",
+      "interpolation": "smooth",
+      "closed": false,
+      "sections": [
+        {
+          "angle_deg": 0.0,
+          "entities_2d": [
+            {
+              "type": "arc",
+              "name": "s0_up",
+              "center": [
+                339.9759657,
+                -141.81326123
+              ],
+              "radius": 370.76740887,
+              "start_deg": 161.43511946,
+              "end_deg": 153.18780039,
+              "dir": -1
+            },
+            {
+              "type": "arc",
+              "name": "s0_te",
+              "center": [
+                10.06942523,
+                24.92270201
+              ],
+              "radius": 1.12,
+              "start_deg": 153.18780049,
+              "end_deg": 356.44684571,
+              "dir": -1
+            },
+            {
+              "type": "arc",
+              "name": "s0_lo",
+              "center": [
+                -77.01053087,
+                30.32983283
+              ],
+              "radius": 88.36766942,
+              "start_deg": 356.44684563,
+              "end_deg": 320.86779034,
+              "dir": -1
+            },
+            {
+              "type": "arc",
+              "name": "s0_le",
+              "center": [
+                -9.82967701,
+                -24.32930434
+              ],
+              "radius": 1.76,
+              "start_deg": 320.8677901,
+              "end_deg": 161.43511958,
+              "dir": -1
+            }
+          ],
+          "constraints": [
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s0_up",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s0_te",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s0_te",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s0_lo",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s0_lo",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s0_le",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s0_le",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s0_up",
+                  "pt": "start"
+                }
+              ]
+            }
+          ],
+          "start_vertex": {
+            "entity": "s0_up",
+            "pt": "start"
+          }
+        },
+        {
+          "angle_deg": 7.5,
+          "entities_2d": [
+            {
+              "type": "arc",
+              "name": "s1_up",
+              "center": [
+                -231.00593821,
+                166.27987889
+              ],
+              "radius": 291.08160844,
+              "start_deg": 317.13442601,
+              "end_deg": 330.12095818,
+              "dir": 1
+            },
+            {
+              "type": "arc",
+              "name": "s1_te",
+              "center": [
+                22.04033293,
+                20.89496096
+              ],
+              "radius": 0.756,
+              "start_deg": 150.12095806,
+              "end_deg": 342.67942097,
+              "dir": -1
+            },
+            {
+              "type": "arc",
+              "name": "s1_lo",
+              "center": [
+                -78.45587283,
+                52.23564485
+              ],
+              "radius": 106.02577648,
+              "start_deg": 342.679421,
+              "end_deg": 306.03200265,
+              "dir": -1
+            },
+            {
+              "type": "arc",
+              "name": "s1_le",
+              "center": [
+                -16.7864097,
+                -32.54546562
+              ],
+              "radius": 1.188,
+              "start_deg": 306.03200256,
+              "end_deg": 137.13442611,
+              "dir": -1
+            }
+          ],
+          "constraints": [
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s1_up",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s1_te",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s1_te",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s1_lo",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s1_lo",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s1_le",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s1_le",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s1_up",
+                  "pt": "start"
+                }
+              ]
+            }
+          ],
+          "start_vertex": {
+            "entity": "s1_up",
+            "pt": "start"
+          }
+        },
+        {
+          "angle_deg": 15.0,
+          "entities_2d": [
+            {
+              "type": "arc",
+              "name": "s2_up",
+              "center": [
+                -341.14429313,
+                404.1936684
+              ],
+              "radius": 541.92525814,
+              "start_deg": 305.82377675,
+              "end_deg": 313.71055899,
+              "dir": 1
+            },
+            {
+              "type": "arc",
+              "name": "s2_te",
+              "center": [
+                33.70215319,
+                12.08396616
+              ],
+              "radius": 0.532,
+              "start_deg": 133.71055839,
+              "end_deg": 321.60085089,
+              "dir": -1
+            },
+            {
+              "type": "arc",
+              "name": "s2_lo",
+              "center": [
+                -114.73096237,
+                129.72701883
+              ],
+              "radius": 189.93178257,
+              "start_deg": 321.60084993,
+              "end_deg": 298.85675552,
+              "dir": -1
+            },
+            {
+              "type": "arc",
+              "name": "s2_le",
+              "center": [
+                -23.46927568,
+                -35.88855873
+              ],
+              "radius": 0.836,
+              "start_deg": 298.85675524,
+              "end_deg": 125.82377705,
+              "dir": -1
+            }
+          ],
+          "constraints": [
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s2_up",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s2_te",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s2_te",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s2_lo",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s2_lo",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s2_le",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s2_le",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s2_up",
+                  "pt": "start"
+                }
+              ]
+            }
+          ],
+          "start_vertex": {
+            "entity": "s2_up",
+            "pt": "start"
+          }
+        },
+        {
+          "angle_deg": 22.5,
+          "entities_2d": [
+            {
+              "type": "arc",
+              "name": "s3_up",
+              "center": [
+                -196.14983641,
+                377.88055422
+              ],
+              "radius": 425.6112201,
+              "start_deg": 293.5675107,
+              "end_deg": 302.05557491,
+              "dir": 1
+            },
+            {
+              "type": "arc",
+              "name": "s3_te",
+              "center": [
+                29.93293005,
+                16.85220236
+              ],
+              "radius": 0.364,
+              "start_deg": 122.05557537,
+              "end_deg": 308.44915137,
+              "dir": -1
+            },
+            {
+              "type": "arc",
+              "name": "s3_lo",
+              "center": [
+                -80.17884595,
+                155.53412566
+              ],
+              "radius": 177.44386634,
+              "start_deg": 308.44915172,
+              "end_deg": 287.9227517,
+              "dir": -1
+            },
+            {
+              "type": "arc",
+              "name": "s3_le",
+              "center": [
+                -25.74927695,
+                -12.75455228
+              ],
+              "radius": 0.572,
+              "start_deg": 287.92275245,
+              "end_deg": 113.56751092,
+              "dir": -1
+            }
+          ],
+          "constraints": [
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s3_up",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s3_te",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s3_te",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s3_lo",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s3_lo",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s3_le",
+                  "pt": "start"
+                }
+              ]
+            },
+            {
+              "type": "same_point",
+              "refs": [
+                {
+                  "entity": "s3_le",
+                  "pt": "end"
+                },
+                {
+                  "entity": "s3_up",
+                  "pt": "start"
+                }
+              ]
+            }
+          ],
+          "start_vertex": {
+            "entity": "s3_up",
+            "pt": "start"
+          }
+        }
+      ],
+      "metric_tag": "AFTER_SINGLE_BLADE"
+    },
+    {
+      "id": "fan_blades_pattern",
+      "op": "axis_pattern",
+      "name_zh": "十八叶风扇圆周阵列",
+      "leader": "fan_blade",
+      "axis": "axis_fan",
+      "count": 18,
+      "increment_deg": 20.0,
+      "metric_tag": "AFTER_BLADE_PATTERN"
+    },
+    {
+      "id": "app_titanium_base",
+      "op": "set_appearance",
+      "scope": "part",
+      "apply_to_faces": true,
+      "preset": "brushed_steel",
+      "rgb": [
+        172,
+        180,
+        190
+      ],
+      "appearance_name": "tfan_titanium_hub"
+    },
+    {
+      "id": "app_spinner_carbon",
+      "op": "set_appearance",
+      "scope": "surfaces",
+      "filter": {
+        "z_range": [
+          65.5,
+          170.0
+        ],
+        "bbox_inside": true
+      },
+      "preset": "matte_paint",
+      "rgb": [
+        36,
+        40,
+        46
+      ],
+      "highlite": 0.42,
+      "shininess": 0.4,
+      "appearance_name": "tfan_spinner_carbon"
+    },
+    {
+      "id": "app_spiral_white",
+      "op": "set_appearance",
+      "scope": "features",
+      "features": [
+        "spinner_spiral_groove"
+      ],
+      "preset": "white_tex_base",
+      "rgb": [
+        242,
+        244,
+        246
+      ],
+      "appearance_name": "tfan_spiral_white"
+    },
+    {
+      "id": "app_fan_blades",
+      "op": "set_appearance",
+      "scope": "features",
+      "features": [
+        "fan_blade",
+        "fan_blades_pattern"
+      ],
+      "preset": "brushed_steel",
+      "rgb": [
+        196,
+        204,
+        214
+      ],
+      "appearance_name": "tfan_blade_titanium"
+    },
+    {
+      "id": "app_rear_hub_gunmetal",
+      "op": "set_appearance",
+      "scope": "surfaces",
+      "filter": {
+        "z_range": [
+          -49.0,
+          -25.0
+        ],
+        "bbox_inside": true
+      },
+      "preset": "gunmetal",
+      "rgb": [
+        74,
+        80,
+        88
+      ],
+      "appearance_name": "tfan_rear_anodized"
+    }
+  ]
+}

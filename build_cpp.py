@@ -35,7 +35,7 @@ DEFAULT_PLAN = ROOT / "plans" / "flanged_hub.json"
 
 def kill_creo() -> None:
     """Terminate any lingering Creo background/worker processes before or after a session."""
-    for img in ("xtop.exe", "nmsd.exe"):
+    for img in ("parametric.exe", "xtop.exe", "nmsd.exe"):
         res = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {img}"], capture_output=True, text=True)
         if img in res.stdout:
             subprocess.run(["taskkill", "/F", "/IM", img, "/T"], capture_output=True)
@@ -44,6 +44,33 @@ def kill_creo() -> None:
         if "xtop.exe" not in res.stdout:
             break
         time.sleep(0.2)
+
+
+def build_creo_process_env(creo: CreoInstallInfo, base_env: dict[str, str] | None = None) -> dict[str, str]:
+    """Build a clean environment for parametric.exe without stale PRO_* overrides."""
+    env = dict(base_env if base_env is not None else os.environ)
+    for stale_key in ("PRO_DIRECTORY", "PRO_MACHINE_TYPE", "CREO_COMMON_FILES"):
+        for existing in [k for k in env if k.upper() == stale_key]:
+            env.pop(existing, None)
+
+    creo_root = Path(creo.creo_root) if creo.creo_root else Path(creo.creo_exe).parents[2]
+    runtime_dirs = [
+        creo_root / "Common Files" / "x86e_win64" / "lib",
+        creo_root / "Common Files" / "x86e_win64" / "deflib",
+        creo_root / "Common Files" / "x86e_win64" / "obj",
+        creo_root / "Common Files" / "libs" / "dfor" / "lib",
+        creo_root / "Parametric" / "bin",
+    ]
+    path_key = next((k for k in env if k.upper() == "PATH"), "PATH")
+    existing_parts = [p for p in env.get(path_key, "").split(os.pathsep) if p]
+    existing_norm = {p.lower() for p in existing_parts}
+    prefix_parts = [str(d) for d in runtime_dirs if d.is_dir() and str(d).lower() not in existing_norm]
+    if prefix_parts:
+        env[path_key] = os.pathsep.join(prefix_parts + existing_parts)
+
+    if creo.license_value:
+        env["PTC_D_LICENSE_FILE"] = creo.license_value
+    return env
 
 
 def compile_and_unlock(creo: CreoInstallInfo, msvc: MsvcToolchainInfo) -> Path:
@@ -217,9 +244,7 @@ def run_creo_phase(
     elif open_cli_prt is not None:
         cmd.append(f"{open_cli_prt.name}.1")
 
-    proc_env = os.environ.copy()
-    if creo.license_value:
-        proc_env["PTC_D_LICENSE_FILE"] = creo.license_value
+    proc_env = build_creo_process_env(creo)
 
     with open(workdir / "proc.log", "w", encoding="utf-8") as fh:
         subprocess.Popen(cmd, cwd=str(workdir), env=proc_env, stdout=fh, stderr=fh)
@@ -268,6 +293,27 @@ def latest_mdl_iteration(folder: Path, stem: str, ext: str = "prt") -> Path:
 
 def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest().upper()
+
+
+def normalize_mirror_inf(raw: bytes) -> bytes:
+    """Normalize Creo 8.0 build-time ProCmdFtMirror .inf blocks to match reopen exports."""
+    for enc in ("utf-8", "gbk"):
+        try:
+            txt = raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+        if "镜像项" in txt:
+            pat = re.compile(
+                r"^[ \t]*2[ \t]+镜像项[ \t]+已定义[ \t]*\r?\n"
+                r"([ \t]*)3([ \t]+镜像平面[^\r\n]*\r?\n)"
+                r"([ \t]*)4([ \t]+不复制任何副本[^\r\n]*\r?\n)"
+                r"([ \t]*)5([ \t]+完全从属副本[^\r\n]*\r?\n)",
+                re.MULTILINE,
+            )
+            txt2, n = pat.subn(r"\g<1>2\g<2>\g<3>3\g<4>\g<5>4\g<6>", txt)
+            if n > 0:
+                return txt2.encode(enc)
+    return raw
 
 
 def collect_plan_textures(plan_data: dict, plan_dir: Path) -> list[Path]:
@@ -320,6 +366,14 @@ def build_and_verify_single_plan(
         or bool(plan_data.get("motors"))
         or any(
             op.get("op") in ("solid_blend", "rotational_blend", "helical_sweep", "servo_motor", "mechanism_analysis")
+            or (
+                op.get("op") == "mirror"
+                and (
+                    "features" in op
+                    or "feature" in op
+                    or any(isinstance(r, dict) and "feature" in r for r in op.get("references", []))
+                )
+            )
             for op in plan_data.get("operations", [])
         )
     )
@@ -359,6 +413,7 @@ def build_and_verify_single_plan(
         f"{part_name}_front.jpg",
         f"{part_name}_top.jpg",
         f"{part_name}_right.jpg",
+        f"{part_name}_mech_end.jpg",
         "build_report.txt",
     ):
         src = STAGE_DIR / fn
@@ -387,8 +442,12 @@ def build_and_verify_single_plan(
                 h1 = file_sha256(build_inf)
                 h2 = file_sha256(dest_dir / "verify_reopen.inf")
                 if h1 != h2:
-                    raise RuntimeError(f".inf SHA256 mismatch after reopen for '{part_name}': {h1} != {h2}")
-                print(f"[verify:{part_name}] .inf SHA256 match: {h1}")
+                    nh1 = hashlib.sha256(normalize_mirror_inf(build_inf.read_bytes())).hexdigest().upper()
+                    if nh1 != h2:
+                        raise RuntimeError(f".inf SHA256 mismatch after reopen for '{part_name}': {h1} != {h2}")
+                    print(f"[verify:{part_name}] .inf SHA256 match (normalized mirror rows): {nh1}")
+                else:
+                    print(f"[verify:{part_name}] .inf SHA256 match: {h1}")
         print(f"[verify:{part_name}] Reopen & force-regen passed:")
         print(verify_report.rstrip())
 
@@ -450,7 +509,7 @@ def main() -> int:
         default=None,
         help="Optional flat deliverable directory containing only .asm.1, .prt.1, and .jpg screenshots",
     )
-    parser.add_argument("--timeout", type=float, default=240.0, help="Timeout per Creo phase in seconds")
+    parser.add_argument("--timeout", type=float, default=360.0, help="Timeout per Creo phase in seconds")
     args = parser.parse_args()
 
     creo = discover_creo(

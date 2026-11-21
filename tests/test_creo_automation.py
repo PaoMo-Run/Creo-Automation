@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -192,6 +194,62 @@ class TestPortableMsvcManifestSelection(unittest.TestCase):
             txt = bat.read_text(encoding="utf-8")
             self.assertIn("%~dp0VC\\Tools\\MSVC\\14.29.30133", txt)
             self.assertIn("set \"SDK_VER=10.0.19041.0\"", txt)
+
+
+class TestBuildRuntimeHelpers(unittest.TestCase):
+    def test_build_creo_process_env_strips_stale_vars_and_prepends_runtime_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            creo_root = _make_mock_creo_tree(Path(td) / "Creo 8.0.0.0", with_sdk=True)
+            for rel in (
+                Path("Common Files") / "x86e_win64" / "lib",
+                Path("Common Files") / "x86e_win64" / "deflib",
+                Path("Common Files") / "libs" / "dfor" / "lib",
+            ):
+                (creo_root / rel).mkdir(parents=True, exist_ok=True)
+            with mock.patch.dict(os.environ, {"PTC_D_LICENSE_FILE": "", "LM_LICENSE_FILE": ""}):
+                info = creobuild_env.inspect_creo_installation(creo_root, source="test")
+            base_env = {
+                "PRO_DIRECTORY": "C:\\broken\\creo",
+                "pro_machine_type": "x86e_win64",
+                "CREO_COMMON_FILES": "C:\\broken\\common",
+                "Path": "C:\\Windows\\System32",
+            }
+            env = build_cpp.build_creo_process_env(info, base_env=base_env)
+            self.assertNotIn("PRO_DIRECTORY", {k.upper() for k in env})
+            self.assertNotIn("PRO_MACHINE_TYPE", {k.upper() for k in env})
+            self.assertNotIn("CREO_COMMON_FILES", {k.upper() for k in env})
+            self.assertEqual(env.get("PTC_D_LICENSE_FILE"), "7788@localhost")
+            path_parts = env["Path"].split(";")
+            expected_prefix = [
+                str(creo_root / "Common Files" / "x86e_win64" / "lib"),
+                str(creo_root / "Common Files" / "x86e_win64" / "deflib"),
+                str(creo_root / "Common Files" / "x86e_win64" / "obj"),
+                str(creo_root / "Common Files" / "libs" / "dfor" / "lib"),
+                str(creo_root / "Parametric" / "bin"),
+            ]
+            self.assertEqual(path_parts[:5], expected_prefix)
+            self.assertEqual(path_parts[5], "C:\\Windows\\System32")
+
+    def test_normalize_mirror_inf_utf8_and_gbk(self) -> None:
+        build_block = (
+            "   1 模型名称 PART\r\n"
+            "   2 镜像项 已定义\r\n"
+            "   3 镜像平面 RIGHT\r\n"
+            "   4 不复制任何副本\r\n"
+            "   5 完全从属副本\r\n"
+        )
+        reopen_block = (
+            "   1 模型名称 PART\r\n"
+            "   2 镜像平面 RIGHT\r\n"
+            "   3 不复制任何副本\r\n"
+            "   4 完全从属副本\r\n"
+        )
+        for enc in ("utf-8", "gbk"):
+            norm = build_cpp.normalize_mirror_inf(build_block.encode(enc))
+            self.assertEqual(norm, reopen_block.encode(enc))
+
+        plain = b"FEATURE_COUNT 14\r\nVOL 100.0\r\n"
+        self.assertEqual(build_cpp.normalize_mirror_inf(plain), plain)
 
 
 if __name__ == "__main__":

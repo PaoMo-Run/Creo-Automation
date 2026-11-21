@@ -28,6 +28,7 @@ The C++17 Pro/TOOLKIT engine (`src_c/creo_auto_modeler.cpp` & `src_c/creo_plan_c
 | `textures` | `string[]` | `[]` | Extra texture bitmap files to stage into Creo working directory before `set_texture`. |
 | `motors` | `object[]` | `[]` | Assembly-level Mechanism servo motors (`PRO_FEAT_PM_MOTOR`). |
 | `mechanism_analysis` | `boolean` | `false` | Run and persist `AnalysisDefinition1` in Creo Mechanism mode after motors are created. |
+| `export_mech_end_view` | `boolean` | `false` | Export `<part_name>_mech_end.jpg` at the final Mechanism playback pose (`t = end`). |
 | `operations` | `object[]` | *(required)* | Ordered list of modeling operations. |
 
 ---
@@ -118,7 +119,9 @@ The C++17 Pro/TOOLKIT engine (`src_c/creo_auto_modeler.cpp` & `src_c/creo_plan_c
 - **`flat_fill`**: `curve` (`sketched_curve` `id`)
 - **`quilt_merge`**: `quilts` (`string[]`) or `target` + `tool`
 - **`solidify`**: `quilt`, `mode` (`"add"`/`"cut"`), `attach_body`, `side` (`"auto"`, `"side_one"`, `"side_two"`)
-- **`mirror`**: `plane`, `references` (empty for whole-part mirror; or `quilt` / `curve_feat` references — never raw solid features), `keep_original` (`true` default)
+- **`mirror`**: supports two modes:
+  - **Geometry / whole-part mirror** (`op_mirror`): `plane`, optional `references` (empty for whole-part mirror; or `quilt` / `curve_feat` references — never raw solid features), `keep_original` (`true` default).
+  - **Feature / group mirror (`ProCmdFtMirror`)**: `plane` + `features` (`string[]`) or `feature` (`string`), optional `expand_groups` (`true` default — expands `feature_group` member IDs before pre-selection) and `dependent` (`true` default). Triggers `needs_active_ui` automatically so simulated selection buffers and downstream `set_appearance`/`set_texture` (`scope: "features"`) propagate cleanly to mirrored subfeatures.
 
 ### 3.6 Assemblies, Mechanism Joints & Servo Motors
 

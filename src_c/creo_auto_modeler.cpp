@@ -501,12 +501,15 @@ ProFeature op_feature_group(PlanContext &ctx, const Json &op) {
     }
 
     ProGroup grp{};
+    std::string id_str = op.value("id", "feature_group");
+    std::vector<int> mem_vec(ids, ids + n);
     ProError st = ProLocalGroupCreate(ctx.solid, ids, n, wname.empty() ? nullptr : gp_name, &grp);
     ProArrayFree(reinterpret_cast<ProArray *>(&ids));
     if (st != PRO_TK_NO_ERROR) {
         log_st(ctx.log, "ProLocalGroupCreate", st);
         throw st;
     }
+    ctx.group_member_ids[id_str] = std::move(mem_vec);
     ProFeature head{};
     ProFeatureInit(ctx.solid, grp.id, &head);
     return head;
@@ -1890,6 +1893,7 @@ struct ActiveBuildState {
     bool finished = false;
     bool mech_done = false;
 
+    bool used_mirror_feats = false;
     std::string pending_op;
     std::string pending_id;
     std::wstring pending_name;
@@ -1980,7 +1984,8 @@ void finish_build_and_close(ProError st) {
         // Also probe ProSelect / ProMdl for PRO_MDO_CONN_AXIS_* via ProFeatureVisit or ProSolidFeatVisit
     }
 
-    if (st == PRO_TK_NO_ERROR && g_build.ctx.solid && g_build.ctx.is_assembly) {
+    if (st == PRO_TK_NO_ERROR && g_build.ctx.solid &&
+        (g_build.ctx.is_assembly || g_build.used_mirror_feats)) {
         ProSolidRegenerate(g_build.ctx.solid, PRO_REGEN_FORCE_REGEN);
     }
 
@@ -2145,6 +2150,16 @@ void run_mech_log_pose_impl(FILE *log) {
                 log_component_placement(log, g_build.ctx.solid, ("POST_ANALYSIS:" + id).c_str(), &it->second);
             }
         }
+    }
+    if (g_build.plan.value("export_mech_end_view", false) && g_build.win_id != PRO_VALUE_UNUSED) {
+        ProSelbufferClear();
+        DatumDisplayGuard guard;
+        if (g_build.plan.value("hide_datums_in_views", false)) {
+            guard.hide();
+        }
+        std::wstring j_mech = g_build.w_part + L"_mech_end.jpg";
+        ProError rst = export_view_jpg(g_build.ctx.mdl, g_build.win_id, L"DEFAULT", j_mech.c_str());
+        log_printf(log, "MECH_END_JPG st=%d\n", static_cast<int>(rst));
     }
     fflush(log);
 }
@@ -2452,6 +2467,76 @@ void schedule_helical_sweep(const Json &op, const std::string &id_str) {
     launch_dashboard_macro(macro, "HLSWP");
 }
 
+bool is_feature_mirror_op(const Json &op) {
+    if (op.contains("features") || op.contains("feature")) return true;
+    if (op.contains("references") && op["references"].is_array()) {
+        for (const Json &r : op["references"]) {
+            if (r.is_object() && r.contains("feature")) return true;
+        }
+    }
+    return false;
+}
+
+void schedule_feature_mirror(const Json &op, const std::string &id_str) {
+    std::vector<std::string> feat_keys;
+    if (op.contains("features") && op["features"].is_array()) {
+        for (const Json &f : op["features"]) feat_keys.push_back(f.get<std::string>());
+    } else if (op.contains("feature") && op["feature"].is_string()) {
+        feat_keys.push_back(op["feature"].get<std::string>());
+    } else if (op.contains("references") && op["references"].is_array()) {
+        for (const Json &r : op["references"]) {
+            if (r.is_object() && r.contains("feature")) feat_keys.push_back(r["feature"].get<std::string>());
+        }
+    }
+    if (feat_keys.empty()) throw PRO_TK_BAD_INPUTS;
+
+    std::vector<int> fids_to_sel;
+    bool expand_groups = op.value("expand_groups", true);
+    for (const std::string &fk : feat_keys) {
+        if (expand_groups) {
+            auto git = g_build.ctx.group_member_ids.find(fk);
+            if (git != g_build.ctx.group_member_ids.end()) {
+                for (int mid : git->second) fids_to_sel.push_back(mid);
+                continue;
+            }
+        }
+        auto fit = g_build.ctx.features.find(fk);
+        if (fit == g_build.ctx.features.end()) {
+            log_printf(g_build.log, "ERROR_MIRROR_FEAT_NOT_FOUND[%s] key=%s\n", id_str.c_str(), fk.c_str());
+            throw PRO_TK_E_NOT_FOUND;
+        }
+        fids_to_sel.push_back(fit->second.id);
+    }
+
+    ProSelection plane_sel = nullptr;
+    if (resolve_plane_selection(g_build.ctx, op.at("plane"), &plane_sel) != PRO_TK_NO_ERROR || !plane_sel) {
+        throw PRO_TK_E_NOT_FOUND;
+    }
+
+    prepare_macro_op(op, id_str, "mirror_feats");
+    g_build.macro_sel_queue.push_back(plane_sel);
+
+    for (int fid : fids_to_sel) {
+        ProModelitem mi{};
+        ProSelection fsel = nullptr;
+        ProError ist = ProModelitemInit(g_build.ctx.mdl, fid, PRO_FEATURE, &mi);
+        ProError sst = (ist == PRO_TK_NO_ERROR) ? ProSelectionAlloc(nullptr, &mi, &fsel) : ist;
+        ProError ab_st = (sst == PRO_TK_NO_ERROR && fsel) ? ProSelbufferSelectionAdd(fsel) : sst;
+        if (fsel) ProSelectionFree(&fsel);
+        log_printf(g_build.log, "  MIRROR_PRE_SEL[%s] fid=%d st=%d\n", id_str.c_str(), fid, static_cast<int>(ab_st));
+        if (ab_st != PRO_TK_NO_ERROR) throw ab_st;
+    }
+
+    std::wstring macro =
+        L"~ Command `ProCmdFtMirror`;"
+        L" ~ Command `CreoMacroPickRef`;"
+        L" ~ Activate `main_dlg_cur` `maindashInst0.MainDashList` 0;"
+        L" ~ Activate `main_dlg_cur` `dashInst0.stdbtn_1`;"
+        L" ~ Command `CreoBuildResume`;";
+    g_build.used_mirror_feats = true;
+    launch_dashboard_macro(macro, "MIRROR");
+}
+
 void run_build_steps() {
     PlanContext &ctx = g_build.ctx;
     FILE *log = g_build.log;
@@ -2474,6 +2559,10 @@ void run_build_steps() {
             }
             if (kind == "helical_sweep") {
                 schedule_helical_sweep(op, id);
+                return;
+            }
+            if (kind == "mirror" && is_feature_mirror_op(op)) {
+                schedule_feature_mirror(op, id);
                 return;
             }
             if (kind == "set_appearance" || kind == "set_texture") {
@@ -2966,16 +3055,41 @@ int creo_build_resume_cb(uiCmdCmdId cmd_id, uiCmdValue *p_val, void *appdata) {
     ProFeattype want_type = g_build.pending_is_cut ? PRO_FEAT_CUT : PRO_FEAT_PROTRUSION;
     ProFeature created{};
     bool found = false;
-    for (int fid : after_ids) {
-        if (g_build.pre_blend_feat_ids.count(fid)) continue;
-        ProFeature f{};
-        ProFeattype ftype = PRO_FEAT_FIRST_FEAT;
-        if (ProFeatureInit(g_build.ctx.solid, fid, &f) == PRO_TK_NO_ERROR &&
-            ProFeatureTypeGet(&f, &ftype) == PRO_TK_NO_ERROR &&
-            (ftype == want_type || ftype == PRO_FEAT_PROTRUSION || ftype == PRO_FEAT_CUT)) {
-            created = f;
-            found = true;
-            break;
+    std::vector<int> mirror_created_ids;
+    if (g_build.pending_op == "mirror_feats") {
+        for (int fid : after_ids) {
+            if (g_build.pre_blend_feat_ids.count(fid)) continue;
+            ProFeature f{};
+            ProFeattype ftype = PRO_FEAT_FIRST_FEAT;
+            if (ProFeatureInit(g_build.ctx.solid, fid, &f) == PRO_TK_NO_ERROR &&
+                ProFeatureTypeGet(&f, &ftype) == PRO_TK_NO_ERROR) {
+                ProFeatStatus fst = PRO_FEAT_INVALID;
+                ProFeatureStatusGet(&f, &fst);
+                if (fst != PRO_FEAT_ACTIVE) continue;
+                mirror_created_ids.push_back(fid);
+                if (!found || ftype == PRO_FEAT_GROUP_HEAD) {
+                    created = f;
+                    found = true;
+                }
+                log_printf(g_build.log, "  MIRROR_CREATED[%s] fid=%d ftype=%d\n",
+                           g_build.pending_id.c_str(), fid, static_cast<int>(ftype));
+            }
+        }
+        if (found && !mirror_created_ids.empty()) {
+            g_build.ctx.group_member_ids[g_build.pending_id] = mirror_created_ids;
+        }
+    } else {
+        for (int fid : after_ids) {
+            if (g_build.pre_blend_feat_ids.count(fid)) continue;
+            ProFeature f{};
+            ProFeattype ftype = PRO_FEAT_FIRST_FEAT;
+            if (ProFeatureInit(g_build.ctx.solid, fid, &f) == PRO_TK_NO_ERROR &&
+                ProFeatureTypeGet(&f, &ftype) == PRO_TK_NO_ERROR &&
+                (ftype == want_type || ftype == PRO_FEAT_PROTRUSION || ftype == PRO_FEAT_CUT)) {
+                created = f;
+                found = true;
+                break;
+            }
         }
     }
     if (!found) {
@@ -3025,6 +3139,12 @@ int creo_build_resume_cb(uiCmdCmdId cmd_id, uiCmdValue *p_val, void *appdata) {
     }
     clear_pending_macro_state();
     g_build.next_idx++;
+    if (g_step_timer) {
+        char dlg_name[] = "main_dlg_cur";
+        if (ProUIDialogTimerStart(dlg_name, g_step_timer, 120, PRO_B_FALSE) == PRO_TK_NO_ERROR) {
+            return 0;
+        }
+    }
     run_build_steps();
     return 0;
 }

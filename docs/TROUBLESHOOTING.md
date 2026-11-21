@@ -57,3 +57,17 @@
 ### `ERROR_CUT_NO_MATERIAL`
 - **Cause**: A `"mode": "cut"` operation did not intersect existing solid material (volume reduction `<= 1e-6 mm³`), or `side` extruded away from the solid.
 - **Fix**: Switch `"side"` between `"side_two"` and `"side_one"`, verify `attach_body: true` on the base solid, and verify sketch coordinates in 3D/RZ match the solid body.
+
+### `xtop.exe - 系统错误`: missing `true_solid_wrappersmt.dll`, `cxx14mt.dll`, `gen_cloudmt.dll`, or `xalancmt.dll` (`0xC0000135`)
+- **Cause**:
+  - A stale `PRO_DIRECTORY`, `PRO_MACHINE_TYPE`, or `CREO_COMMON_FILES` environment variable is set in the shell (for example `PRO_DIRECTORY` pointing to `<CREO_ROOT>` instead of `<CREO_ROOT>\Common Files`), causing `parametric.psf` to look in the wrong directory;
+  - `xtop.exe` was invoked directly instead of `parametric.exe parametric.psf`, or `<CREO_ROOT>\Common Files\x86e_win64\lib` was missing from `PATH`;
+  - An AI coding agent ran `build_cpp.py` inside a restricted sandbox (such as Codex `workspace-write`) and rewrote the launcher scripts after Creo failed inside the sandbox.
+- **Fix**:
+  - Use the unmodified `build_cpp.py` (`git checkout -- build_cpp.py setup.py src_c` if an agent modified them). `build_cpp.py` clears stale `PRO_DIRECTORY` / `PRO_MACHINE_TYPE` / `CREO_COMMON_FILES`, prepends Creo's `Common Files\x86e_win64\{lib,deflib,obj}`, `Common Files\libs\dfor\lib`, and `Parametric\bin` directories to `PATH`, and launches `parametric.exe` with `parametric.psf`.
+  - If using Codex CLI/IDE, grant Full Access / Windows host execution when running Creo, or run `.\setup.ps1` and `python build_cpp.py --plan plans/flanged_hub.json` in a normal Windows PowerShell terminal.
+  - Note on visible GUI window: interactive commands executed under the normal Windows desktop session launch Creo on the desktop (rather than an isolated agent virtual desktop), which is normal when `parametric.exe` builds interactive features or assemblies.
+
+### `python` is not recognized in PowerShell (Python installed only in `%LocalAppData%\Programs\Python`)
+- **Cause**: Windows Store / user-local Python installations are sometimes omitted from the system `PATH` and have no `py.exe` launcher.
+- **Fix**: Run `.\setup.ps1` (which probes `%LocalAppData%\Programs\Python\Python3*\python.exe` and `%ProgramFiles%\Python*\python.exe` automatically), or call your Python executable by full path, e.g. `& "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" build_cpp.py --plan plans/flanged_hub.json`.

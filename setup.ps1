@@ -22,21 +22,39 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+$pythonExe = $null
+$baseArgs = @()
+
 $pyCmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pyCmd) {
+if ($pyCmd) {
+    $pythonExe = $pyCmd.Source
+} else {
     $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
     if ($pyLauncher) {
-        $pythonExe = "py"
+        $pythonExe = $pyLauncher.Source
         $baseArgs = @("-3")
     } else {
-        Write-Host "[Creo-Automation] Python 3.10+ was not found on PATH." -ForegroundColor Red
-        Write-Host "Install Python cleanly via winget:" -ForegroundColor Yellow
-        Write-Host "  winget install -e --id Python.Python.3.12" -ForegroundColor Cyan
-        exit 2
+        $probeDirs = @(
+            (Join-Path $env:LocalAppData "Programs\Python"),
+            (Join-Path $env:ProgramFiles "Python*")
+        )
+        foreach ($pd in $probeDirs) {
+            if (-not $pd) { continue }
+            $cands = Get-ChildItem -Path (Join-Path $pd "*\python.exe"), (Join-Path $pd "python.exe") -ErrorAction SilentlyContinue |
+                Sort-Object FullName -Descending
+            if ($cands) {
+                $pythonExe = $cands[0].FullName
+                break
+            }
+        }
     }
-} else {
-    $pythonExe = "python"
-    $baseArgs = @()
+}
+
+if (-not $pythonExe) {
+    Write-Host "[Creo-Automation] Python 3.10+ was not found on PATH or standard install folders." -ForegroundColor Red
+    Write-Host "Install Python cleanly via winget:" -ForegroundColor Yellow
+    Write-Host "  winget install -e --id Python.Python.3.12" -ForegroundColor Cyan
+    exit 2
 }
 
 $argsList = @($baseArgs + @("setup.py"))

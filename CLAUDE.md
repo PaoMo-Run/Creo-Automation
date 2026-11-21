@@ -2,8 +2,8 @@
 
 This project (`Creo-Automation`) provides a C++17 Pro/TOOLKIT JSON-plan-driven automation engine for PTC Creo Parametric on Windows x64, paired with pure-stdlib Python auto-discovery and setup scripts.
 
-- Read [AGENTS.md](AGENTS.md) for the autonomous environment check, portable MSVC installation, smoke-test protocol, and engineering invariants.
-- Read [.agents/skills/creo-parametric-automation/SKILL.md](.agents/skills/creo-parametric-automation/SKILL.md) for the full Creo modeling workflow and Pro/TOOLKIT rules.
+- Read [AGENTS.md](AGENTS.md) for the autonomous environment check, portable MSVC installation, smoke-test protocol, sandbox warning, and engineering invariants.
+- Read [.agents/skills/creo-parametric-automation/SKILL.md](.agents/skills/creo-parametric-automation/SKILL.md) and [.agents/skills/creo-parametric-automation/references/feature_mirror_workflow.md](.agents/skills/creo-parametric-automation/references/feature_mirror_workflow.md) for the full Creo modeling workflow and Pro/TOOLKIT rules.
 - Read [docs/PLAN_SCHEMA.md](docs/PLAN_SCHEMA.md) when authoring new `plans/*.json` models.
 
 Quick start for agents:

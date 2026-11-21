@@ -47,7 +47,7 @@ python setup.py --check --json
 Every generated `.prt` / `.asm` must look as if authored by an experienced mechanical engineer inside Creo UI, not generated as an uneditable mesh or exploded plane list:
 
 1. **Minimal Datum Skeleton**: Use `RIGHT`, `TOP`, `FRONT` and only the minimum necessary offset/angled datums and axes. Never create dozens of auxiliary datum planes + discrete loft slices for swept or twisted geometry.
-2. **Single Native Parametric Features**: For twisted blades, spiral grooves, or revolved bodies, always prefer native `rotational_blend` (internal multi-angle sections), `helical_sweep` (internal profile + pitch + section), `revolve`, `extrude`, and `sweep` so an engineer can right-click *Edit Definition* directly in Creo to adjust pitch, angle, or sketch dimensions.
+2. **Single Native Parametric Features & Batch Feature Mirroring**: For twisted blades, spiral grooves, or revolved bodies, always prefer native `rotational_blend` (internal multi-angle sections), `helical_sweep` (internal profile + pitch + section), `revolve`, `extrude`, and `sweep` so an engineer can right-click *Edit Definition* directly in Creo to adjust pitch, angle, or sketch dimensions. For symmetric left/right/front/rear solid or cut features, model one side cleanly and batch-mirror by finish color via `op: "mirror"` (`ProCmdFtMirror` with `features`/`expand_groups`) rather than duplicating feature trees.
 3. **Natural Engineering Feature Order**:
    - Build primary solid bodies attached to `DefaultBody` first -> functional cutouts/grooves -> `round` / `chamfer` -> `feature_group` and `axis_pattern`.
    - Apply local functional finishes via `set_appearance` with `scope: "features"` or spatial `surfaces` filters (never raw face IDs) so colors track feature regeneration cleanly.
@@ -101,6 +101,9 @@ Every generated `.prt` / `.asm` must look as if authored by an experienced mecha
   - Never call `ProSectionEntityGet` on deflected sections (`Sec k`, `k >= 1`) before `ProSectionActiveSet`; use cached `SketchEntityCache` 2D points and analytical 3D section origin shifts (`compute_rotblend_section_shift`).
 - **Mechanism Active-Window Guard**:
   - Assemblies containing `motors` or `mechanism_analysis` require an active visible model window during both build and `verify` (`ProWindowCurrentSet` + `ProWindowActivate` + `ProWindowRepaint` before `PRO_MODEL_INFO` export).
+- **Simulated Manual Feature Mirroring (`ProCmdFtMirror`) & Sketch Limits** (see [feature_mirror_workflow.md](./references/feature_mirror_workflow.md)):
+  - `op: "mirror"` routes `"features"` / `"feature"` operations to `schedule_feature_mirror`, which expands `ctx.group_member_ids` (when `expand_groups: true`), pre-selects features into `ProSelbuffer` *before* launching `ProCmdFtMirror`, records created `PRO_FEAT_GROUP_HEAD` + member IDs into `ctx.group_member_ids` on `CreoBuildResume` (settling via a 120ms UI timer), and triggers `PRO_REGEN_FORCE_REGEN` before save.
+  - Keep collinear narrow rectangles per `IntentManager` sketch `<= 3` (split 4–5 into `2+2` or `3+2` to avoid `ProSectionAutodim st=-1 n_err=0`), keep sloped blend end-caps overlapping walls by `>= 0.5–2 mm`, and model directional text/numbers independently on each side rather than mirroring.
 
 ---
 
@@ -108,8 +111,8 @@ Every generated `.prt` / `.asm` must look as if authored by an experienced mecha
 
 1. `failed=0` on all features (`ProSolidFailedfeaturesList`) and expected volume/area progression.
 2. Zero `!%CE`, `!%CW`, `失序`, or `out of sequence` in both build and reopen `trail.txt.*`.
-3. Reopen `PRO_REGEN_FORCE_REGEN` `.inf` SHA256 matches build `.inf` SHA256.
+3. Reopen `PRO_REGEN_FORCE_REGEN` `.inf` SHA256 matches build `.inf` SHA256 (for `ProCmdFtMirror` models, `build_cpp.py` applies `normalize_mirror_inf` to align Creo 8.0's reopen row numbering).
 4. Multi-view `.jpg` renders visually inspected for contour, holes, orientation, and finish.
 5. For textured models: `TEX_EMBED ... embedded=1` verified in an isolated folder without external `.jpg` files.
-6. Human-like, engineer-editable model tree: clean datum skeleton, native `rotational_blend`/`helical_sweep`/`axis_pattern` hierarchy, feature-scoped coloring, and `0` `Note_` items in assemblies.
-7. No leftover `xtop.exe` or `nmsd.exe` processes after completion.
+6. Human-like, engineer-editable model tree: clean datum skeleton, native `rotational_blend`/`helical_sweep`/`axis_pattern`/`ProCmdFtMirror` hierarchy, feature-scoped coloring, and `0` `Note_` items in assemblies.
+7. No leftover `parametric.exe`, `xtop.exe`, or `nmsd.exe` processes after completion.

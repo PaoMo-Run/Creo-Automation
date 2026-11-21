@@ -9,6 +9,7 @@ If a user sent you this GitHub URL and asked you to **deploy, set up, or run Cre
 ## 1. Autonomous Onboarding & Deployment Protocol
 
 1. **Check the user's Windows environment (machine-readable JSON)**:
+   If `python` is not on `PATH`, probe `%LocalAppData%\Programs\Python\Python3*\python.exe` (or `py -3`) automatically.
    ```powershell
    python setup.py --check --json
    ```
@@ -32,6 +33,7 @@ If a user sent you this GitHub URL and asked you to **deploy, set up, or run Cre
    python build_cpp.py --plan plans/flanged_hub.json
    ```
    Verify the output prints `STATUS=OK`, `FAILED_COUNT=0`, `.inf SHA256 match`, and exits `0`.
+   > **Codex / Restricted Sandbox Note**: Creo Parametric is a multi-process native Windows CAD application (`parametric.exe` -> `nmsd.exe` -> `xtop.exe`) requiring cross-directory DLL/license access and GUI event loops. **Never run `build_cpp.py` inside Codex's restricted `workspace-write` sandbox** (`filesystem=restricted`), and **never modify `build_cpp.py` to launch `xtop.exe` directly or pass `-g:no_graphics`** (which triggers missing-DLL `0xC0000135` crashes and breaks Pro/TOOLKIT graphics/macros). Request full host execution or instruct the user to run `build_cpp.py` in a standard Windows PowerShell. Note that on a standard desktop session (unlike isolated virtual desktops), Creo's window briefly appears for ~10–30s and closes automatically.
 4. **Optional showcase verification**:
    ```powershell
    python build_cpp.py --plan plans/turbofan_intake_fan.json
@@ -42,7 +44,7 @@ If a user sent you this GitHub URL and asked you to **deploy, set up, or run Cre
 
 ## 2. Where Modeling Knowledge Lives
 
-- Read `.agents/skills/creo-parametric-automation/SKILL.md` for Pro/TOOLKIT constraints, 7-step workflow, and acceptance gates.
+- Read `.agents/skills/creo-parametric-automation/SKILL.md` (and `references/feature_mirror_workflow.md`) for Pro/TOOLKIT constraints, 7-step workflow, simulated manual mirroring, and acceptance gates.
 - Read `docs/PLAN_SCHEMA.md` before creating or editing any JSON plan under `plans/`.
 - Read `docs/TROUBLESHOOTING.md` if Creo setup, unlocking, or regeneration fails.
 

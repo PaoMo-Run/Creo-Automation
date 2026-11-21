@@ -108,6 +108,7 @@ struct PlanContext {
     bool use_default_names = false;
     bool is_assembly = false;
     std::map<std::string, ProFeature> features;
+    std::map<std::string, std::vector<int>> group_member_ids;
     std::map<std::string, ProAsmcomp> components;
     std::map<std::string, int> quilt_ids;
 };
@@ -2676,21 +2677,33 @@ inline ProError collect_feature_live_surface_ids(
     auto fit = ctx.features.find(fkey);
     if (fit == ctx.features.end()) return PRO_TK_E_NOT_FOUND;
     std::vector<ProFeature> feats_to_scan;
-    feats_to_scan.push_back(fit->second);
-
-    ProFeattype ftype = PRO_FEAT_FIRST_FEAT;
-    if (ProFeatureTypeGet(&fit->second, &ftype) == PRO_TK_NO_ERROR && ftype == PRO_FEAT_PATTERN_HEAD) {
-        ProPattern pat{};
-        for (ProPatternClass pc : {PRO_FEAT_PATTERN, PRO_GROUP_PATTERN}) {
-            if (ProFeaturePatternGet(&fit->second, pc, &pat) == PRO_TK_NO_ERROR) {
-                ProFeature *members = nullptr;
-                if (ProPatternMembersGet(&pat, &members) == PRO_TK_NO_ERROR && members) {
-                    int n = 0;
-                    ProArraySizeGet(reinterpret_cast<ProArray>(members), &n);
-                    for (int i = 0; i < n; ++i) feats_to_scan.push_back(members[i]);
-                    ProArrayFree(reinterpret_cast<ProArray *>(&members));
+    auto append_feat_or_pattern = [&](const ProFeature &src_feat) {
+        feats_to_scan.push_back(src_feat);
+        ProFeature mutable_f = src_feat;
+        ProFeattype ftype = PRO_FEAT_FIRST_FEAT;
+        if (ProFeatureTypeGet(&mutable_f, &ftype) == PRO_TK_NO_ERROR && ftype == PRO_FEAT_PATTERN_HEAD) {
+            ProPattern pat{};
+            for (ProPatternClass pc : {PRO_FEAT_PATTERN, PRO_GROUP_PATTERN}) {
+                if (ProFeaturePatternGet(&mutable_f, pc, &pat) == PRO_TK_NO_ERROR) {
+                    ProFeature *members = nullptr;
+                    if (ProPatternMembersGet(&pat, &members) == PRO_TK_NO_ERROR && members) {
+                        int n = 0;
+                        ProArraySizeGet(reinterpret_cast<ProArray>(members), &n);
+                        for (int i = 0; i < n; ++i) feats_to_scan.push_back(members[i]);
+                        ProArrayFree(reinterpret_cast<ProArray *>(&members));
+                    }
+                    break;
                 }
-                break;
+            }
+        }
+    };
+    append_feat_or_pattern(fit->second);
+    auto git = ctx.group_member_ids.find(fkey);
+    if (git != ctx.group_member_ids.end()) {
+        for (int mfid : git->second) {
+            ProFeature mf{};
+            if (ProFeatureInit(ctx.solid, mfid, &mf) == PRO_TK_NO_ERROR) {
+                append_feat_or_pattern(mf);
             }
         }
     }

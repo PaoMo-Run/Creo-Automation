@@ -1990,6 +1990,7 @@ void finish_build_and_close(ProError st) {
     }
 
     if (st == PRO_TK_NO_ERROR && g_build.ctx.solid) {
+        hide_auxiliary_ref_features(log, g_build.ctx.mdl, g_build.ctx.solid, g_build.plan, &g_build.ctx, false);
         ProError mst = log_solid_metrics(log, g_build.ctx.solid, "FINAL_MODEL");
         if (mst != PRO_TK_NO_ERROR) st = mst;
         if (st == PRO_TK_NO_ERROR) {
@@ -2850,6 +2851,7 @@ ProError run_verify(FILE *log) {
     }
     if ((st = log_solid_metrics(log, solid, "REOPEN_REGEN")) != PRO_TK_NO_ERROR) return st;
     if ((st = log_feature_tree(log, solid, 1)) != PRO_TK_NO_ERROR) return st;
+    hide_auxiliary_ref_features(log, part_mdl, solid, plan, nullptr, true);
     if (is_asm) {
         AsmCompLogCtx actx{log, solid};
         ProSolidFeatVisit(solid, visit_asm_comp_log_cb, nullptr, &actx);

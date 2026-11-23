@@ -20,7 +20,9 @@ if str(ROOT / "scripts") not in sys.path:
 
 import build_cpp
 import creobuild_env
+import human_ui
 import install_portable_msvc
+import probe_creo_ui
 
 
 def _make_mock_creo_tree(root: Path, *, with_sdk: bool = True, psf_license: str = "7788@localhost") -> Path:
@@ -250,6 +252,60 @@ class TestBuildRuntimeHelpers(unittest.TestCase):
 
         plain = b"FEATURE_COUNT 14\r\nVOL 100.0\r\n"
         self.assertEqual(build_cpp.normalize_mirror_inf(plain), plain)
+
+
+class TestHumanUiAndStageHelpers(unittest.TestCase):
+    def test_motion_curves_and_clamp_capture_rect(self) -> None:
+        self.assertAlmostEqual(human_ui._min_jerk(0.0), 0.0)
+        self.assertAlmostEqual(human_ui._min_jerk(0.5), 0.5)
+        self.assertAlmostEqual(human_ui._min_jerk(1.0), 1.0)
+        pt = human_ui._cubic_bezier((0.0, 0.0), (10.0, 0.0), (10.0, 20.0), (20.0, 20.0), 0.5)
+        self.assertAlmostEqual(pt[0], 10.0)
+        self.assertAlmostEqual(pt[1], 10.0)
+        x, y, w, h = human_ui.clamp_capture_rect((-15, 7, 1925, 1086), (0, 0, 1920, 1080))
+        self.assertEqual((x, y), (0, 7))
+        self.assertEqual(w % 2, 0)
+        self.assertEqual(h % 2, 0)
+        self.assertEqual((w, h), (1920, 1072))
+
+    def test_pause_controller_and_ffmpeg_cmd(self) -> None:
+        with self.assertRaises(ValueError):
+            human_ui.PauseController("F13")
+        pc = human_ui.PauseController("F2", show_hud=False)
+        self.assertFalse(pc.is_pause_requested())
+        pc.toggle()
+        self.assertTrue(pc.is_pause_requested())
+        with pc.critical_section():
+            self.assertEqual(pc.wait_if_paused(), 0.0)
+        with tempfile.TemporaryDirectory() as td:
+            out_mp4 = Path(td) / "demo.mp4"
+            rec = human_ui.FFmpegRecorder(
+                out_mp4,
+                (0, 0, 1920, 1080),
+                fps=30,
+                ffmpeg_exe="ffmpeg",
+                virtual_bounds=(0, 0, 1920, 1080),
+            )
+            cmd = rec.build_ffmpeg_command(Path(td) / "seg_000.mp4")
+            self.assertIn("gdigrab", cmd)
+            self.assertIn("libx264", cmd)
+            self.assertIn("1920x1080", cmd)
+
+    def test_strip_motors_for_ui_stage(self) -> None:
+        raw = {
+            "part_name": "demo_asm",
+            "doc_type": "assembly",
+            "motors": [{"name": "m1"}],
+            "mechanism_analysis": True,
+            "export_mech_end_view": True,
+            "hide_datums_in_views": True,
+        }
+        cleaned = probe_creo_ui.strip_motors_for_ui_stage(raw)
+        self.assertNotIn("motors", cleaned)
+        self.assertFalse(cleaned["mechanism_analysis"])
+        self.assertFalse(cleaned["export_mech_end_view"])
+        self.assertFalse(cleaned["hide_datums_in_views"])
+        self.assertIn("motors", raw)
 
 
 if __name__ == "__main__":

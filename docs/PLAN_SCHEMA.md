@@ -21,6 +21,8 @@ The C++17 Pro/TOOLKIT engine (`src_c/creo_auto_modeler.cpp` & `src_c/creo_plan_c
 | `doc_type` | `string` | `"part"` | `"part"` or `"assembly"`. |
 | `template` | `string` | `"mmns_part_solid_abs"` / `"mmns_asm_design_abs"` | Creo starter template name resolved from `<CREO_ROOT>/Common Files/templates`. |
 | `hide_datums_in_views` | `boolean` | `false` | Temporarily hide datum planes, axes, points, and CSYS when exporting `.jpg` screenshots. |
+| `hide_auxiliary_layers` | `boolean` | `false` | Persist `ProModelitemHide` + `ProLayerDisplaystatusSave` for internal datum/axis/point/curve/CSYS features before saving `.prt`/`.asm`. |
+| `keep_visible_features` | `string[]` | `[]` | Feature names/IDs kept visible when `hide_auxiliary_layers` is `true` (assemblies auto-keep `ASM_RIGHT/TOP/FRONT/DEF_CSYS`). |
 | `export_right_view` | `boolean` | `false` | Export `<part_name>_right.jpg` in addition to `default`, `front`, and `top`. |
 | `output_subdir` | `string` | `part_name` | Optional relative folder under `output/`. |
 | `components_plans` | `string[]` | `[]` | For `assembly` plans: list of child part plan paths built before assembling. |

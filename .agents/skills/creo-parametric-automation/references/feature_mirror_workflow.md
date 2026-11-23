@@ -78,6 +78,14 @@ In `src_c/creo_auto_modeler.cpp`, `"op": "mirror"` routes automatically based on
    - Under `ProSectionIntentManagerModeSet(sec, PRO_B_TRUE)`, putting **more than 3** collinear narrow rectangles along the same axis in a single sketch can trigger implicit collinear/equal-length over-constraints (`ProSectionAutodim st=-1 n_err=0`). Split 4–5 collinear rectangles into `2+2` or `3+2` features. Circular arrays and short centerline-symmetric `revolve` profiles are unaffected.
 3. **Sloped Blend End-Cap Overlap**:
    - End-caps meeting sloped `solid_blend` walls must tuck slightly inward and extend into the solid wall by `>= 0.5–2 mm` so mirror symmetry does not create zero-thickness boundary failures (`FEAT_INACTIVE status=6`).
+4. **Persistent Auxiliary Feature Hiding (`hide_auxiliary_layers`)**:
+   - `DatumDisplayGuard` only toggles `DATUM_DISPLAY` / `AXIS_DISPLAY` / `DATUM_POINT_DISPLAY` / `DISPLAY_COORD_SYS` temporarily around `.jpg` capture. To keep saved `.prt.1` / `.asm.1` deliverables clean when opened in any default Creo session, set:
+     ```json
+     "hide_auxiliary_layers": true,
+     "keep_visible_features": ["RIGHT", "PRT_CSYS_DEF"]
+     ```
+   - On assemblies, `ASM_RIGHT`, `ASM_TOP`, `ASM_FRONT`, and `ASM_DEF_CSYS` are preserved automatically.
+   - Before `ProMdlSave`, `hide_auxiliary_ref_features` in `src_c/creo_plan_core.hpp` walks `PRO_FEAT_DATUM`, `PRO_FEAT_DATUM_AXIS`, `PRO_FEAT_DATUM_POINT`, `PRO_FEAT_CURVE`, and `PRO_FEAT_CSYS`, hides non-kept items via `ProModelitemHide`, and persists state via `ProLayerDisplaystatusSave(mdl)`. Reopen verification re-runs with `check_only = true` (`ProModelitemIsHidden`) and logs `AUX_VERIFY_HIDDEN hidden=<n> kept=<k> err=<e>`.
 
 ---
 

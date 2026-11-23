@@ -106,7 +106,8 @@ python setup.py --install-skill all   # 可选：antigravity | claude | codex
   - **基础实体与阵列**：`extrude`、`revolve`、`round`、`chamfer`、`feature_group`、`axis_pattern`（单特征/组阵列）、`sketched_curve`、`sweep`。
   - **高阶原生交互面板特征**：`solid_blend`、`rotational_blend`（多角度内建草绘混合）、`helical_sweep`（螺旋扫描）。
   - **曲面、装配与机构仿真**：`surface_loft`、`flat_fill`、`quilt_merge`、`solidify`、`mirror`、`assemble_component`（支持 `pin`/`slider`/`cylindrical`/`bearing`/`ball`/`planar` 运动副及闭环 `additional_sets`）、`motors`（`PRO_FEAT_PM_MOTOR`）、`mechanism_analysis`（`AnalysisDefinition1`）、`set_appearance` 与 `set_texture`（内嵌贴图）。
-- **双阶段闭环验证门禁**：每次构建均清理残留 `xtop.exe`/`nmsd.exe`、编译并解锁 `creobuild.dll`，先在 `build_cpp/stage/` 建模导出，再将产物拷入零外部贴图的 `build_cpp/verify/` 独立沙箱重开并执行 `PRO_REGEN_FORCE_REGEN`，校验 `failed=0`、`trail.txt.*` 无 `!%CE`/`!%CW`/`失序`/`out of sequence`，并核对构建与重开导出的 `.inf` SHA256 完全一致。
+- **双阶段闭环验证门禁**：每次构建均清理残留 `xtop.exe`/`nmsd.exe`、编译并解锁 `creobuild.dll`，先在 `build_cpp/stage/` 建模导出，再将产物拷入零外部贴图的 `build_cpp/verify/` 独立沙箱重开并执行 `PRO_REGEN_FORCE_REGEN`，校验 `failed=0`、`trail.txt.*` 无 `!%CE`/`!%CW`/`失序`/`out of sequence`，支持 `hide_auxiliary_layers` 持久化隐藏交付辅助几何（`AUX_VERIFY_HIDDEN`），并核对构建与重开导出的 `.inf` SHA256 完全一致。
+- **桌面机构 UI 拟人化自动化与分段录屏工具链** *（可选）*：[`scripts/human_ui.py`](scripts/human_ui.py) 与 [`scripts/probe_creo_ui.py`](scripts/probe_creo_ui.py) 提供 Per-Monitor DPI 贝塞尔轨迹、Win11 微软拼音 × Creo `HCS16139P` 协同防丢字输入、`F2` 全局暂停/恢复浮窗及 FFmpeg 无损分段 MP4 录屏。
 
 ---
 

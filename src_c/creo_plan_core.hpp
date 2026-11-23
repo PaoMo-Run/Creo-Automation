@@ -39,6 +39,7 @@
 #include <ProGeomitemdata.h>
 #include <ProGroup.h>
 #include <ProIntf3Dexport.h>
+#include <ProLayer.h>
 #include <ProMdl.h>
 #include <ProMdlUnits.h>
 #include <ProMenu.h>
@@ -2159,6 +2160,123 @@ inline ProError export_view_jpg(ProMdl mdl, int win_id, const wchar_t *view_name
     ProWindowRepaint(win_id);
     return ProRasterFileWrite(
         win_id, PRORASTERDEPTH_24, 10.0, 7.5, PRORASTERDPI_200, PRORASTERTYPE_JPEG, const_cast<wchar_t *>(out_file));
+}
+
+struct AuxHideCtx {
+    ProMdl mdl = nullptr;
+    FILE *log = nullptr;
+    std::set<int> keep_fids;
+    std::set<std::string> keep_names;
+    bool check_only = false;
+    int hidden_cnt = 0;
+    int kept_cnt = 0;
+    int err_cnt = 0;
+};
+
+inline bool is_aux_ref_feattype(ProFeattype ftype) {
+    return ftype == PRO_FEAT_DATUM ||
+           ftype == PRO_FEAT_DATUM_AXIS ||
+           ftype == PRO_FEAT_DATUM_POINT ||
+           ftype == PRO_FEAT_CURVE ||
+           ftype == PRO_FEAT_CSYS;
+}
+
+inline ProError visit_aux_hide_action(ProFeature *p_feat, ProError status, ProAppData data) {
+    auto *hctx = static_cast<AuxHideCtx *>(data);
+    ProBoolean is_vis = PRO_B_FALSE;
+    ProFeattype ftype = PRO_FEAT_FIRST_FEAT;
+    (void)status;
+
+    if (ProFeatureVisibilityGet(p_feat, &is_vis) != PRO_TK_NO_ERROR || is_vis != PRO_B_TRUE) {
+        return PRO_TK_NO_ERROR;
+    }
+    if (ProFeatureTypeGet(p_feat, &ftype) != PRO_TK_NO_ERROR || !is_aux_ref_feattype(ftype)) {
+        return PRO_TK_NO_ERROR;
+    }
+
+    ProName wname{};
+    ProModelitemNameGet(reinterpret_cast<ProModelitem *>(p_feat), wname);
+    std::string fname = w2utf8(wname);
+
+    if (hctx->keep_fids.count(p_feat->id) || (!fname.empty() && hctx->keep_names.count(fname))) {
+        hctx->kept_cnt++;
+        return PRO_TK_NO_ERROR;
+    }
+
+    ProModelitem fmi{};
+    if (ProModelitemInit(hctx->mdl, p_feat->id, PRO_FEATURE, &fmi) != PRO_TK_NO_ERROR) {
+        hctx->err_cnt++;
+        return PRO_TK_NO_ERROR;
+    }
+
+    if (hctx->check_only) {
+        ProBoolean is_hid = PRO_B_FALSE;
+        if (ProModelitemIsHidden(&fmi, &is_hid) == PRO_TK_NO_ERROR && is_hid == PRO_B_TRUE) {
+            hctx->hidden_cnt++;
+        } else {
+            hctx->kept_cnt++;
+        }
+        return PRO_TK_NO_ERROR;
+    }
+
+    ProError hst = ProModelitemHide(&fmi);
+    if (hst == PRO_TK_NO_ERROR || hst == PRO_TK_NO_CHANGE) {
+        hctx->hidden_cnt++;
+    } else {
+        hctx->err_cnt++;
+        if (hctx->log) {
+            log_printf(hctx->log, "AUX_HIDE_WARN fid=%d name=%s type=%d st=%d\n",
+                       p_feat->id, fname.c_str(), static_cast<int>(ftype), static_cast<int>(hst));
+        }
+    }
+    return PRO_TK_NO_ERROR;
+}
+
+inline ProError hide_auxiliary_ref_features(
+    FILE *log,
+    ProMdl mdl,
+    ProSolid solid,
+    const Json &plan,
+    const PlanContext *ctx,
+    bool check_only = false
+) {
+    if (!mdl || !solid || !plan.value("hide_auxiliary_layers", false)) return PRO_TK_NO_ERROR;
+
+    AuxHideCtx hctx;
+    hctx.mdl = mdl;
+    hctx.log = log;
+    hctx.check_only = check_only;
+    if (plan.value("doc_type", "part") == "assembly") {
+        hctx.keep_names.insert("ASM_RIGHT");
+        hctx.keep_names.insert("ASM_TOP");
+        hctx.keep_names.insert("ASM_FRONT");
+        hctx.keep_names.insert("ASM_DEF_CSYS");
+    }
+    if (plan.contains("keep_visible_features") && plan["keep_visible_features"].is_array()) {
+        for (const Json &kv : plan["keep_visible_features"]) {
+            if (!kv.is_string()) continue;
+            std::string key = kv.get<std::string>();
+            hctx.keep_names.insert(key);
+            if (ctx) {
+                auto fit = ctx->features.find(key);
+                if (fit != ctx->features.end()) {
+                    hctx.keep_fids.insert(fit->second.id);
+                }
+            }
+        }
+    }
+
+    ProSolidFeatVisit(solid, visit_aux_hide_action, nullptr, &hctx);
+    ProError save_st = PRO_TK_NO_ERROR;
+    if (!check_only) {
+        save_st = ProLayerDisplaystatusSave(mdl);
+    }
+    if (log) {
+        log_printf(log, "%s hidden=%d kept=%d err=%d layer_save_st=%d\n",
+                   check_only ? "AUX_VERIFY_HIDDEN" : "AUX_HIDE",
+                   hctx.hidden_cnt, hctx.kept_cnt, hctx.err_cnt, static_cast<int>(save_st));
+    }
+    return PRO_TK_NO_ERROR;
 }
 
 /* ------------------------------------------------------------------ */

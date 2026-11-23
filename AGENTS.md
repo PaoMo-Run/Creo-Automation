@@ -44,7 +44,7 @@ If a user sent you this GitHub URL and asked you to **deploy, set up, or run Cre
 
 ## 2. Where Modeling Knowledge Lives
 
-- Read `.agents/skills/creo-parametric-automation/SKILL.md` (and `references/feature_mirror_workflow.md`) for Pro/TOOLKIT constraints, 7-step workflow, simulated manual mirroring, and acceptance gates.
+- Read `.agents/skills/creo-parametric-automation/SKILL.md` (alongside `references/feature_mirror_workflow.md` and `references/mechanism_ui_video_recording.md`) for Pro/TOOLKIT constraints, 7-step workflow, simulated manual mirroring, persistent auxiliary hiding, and desktop UI/FFmpeg recording guidelines.
 - Read `docs/PLAN_SCHEMA.md` before creating or editing any JSON plan under `plans/`.
 - Read `docs/TROUBLESHOOTING.md` if Creo setup, unlocking, or regeneration fails.
 
@@ -52,12 +52,12 @@ If a user sent you this GitHub URL and asked you to **deploy, set up, or run Cre
 
 ## 3. Repository & Code Invariants (Do Not Break)
 
-1. **Pure stdlib Python**: Keep `creobuild_env.py`, `setup.py`, `build_cpp.py`, and `scripts/install_portable_msvc.py` free of third-party `pip` dependencies.
+1. **Pure stdlib Python**: Keep `creobuild_env.py`, `setup.py`, `build_cpp.py`, `scripts/install_portable_msvc.py`, `scripts/probe_creo_ui.py` (without `--dump-uia`), and core `scripts/human_ui.py` (`HumanDriver`/`PauseController`/`FFmpegRecorder`) free of required third-party `pip` dependencies (`UIADriver` lazy-imports optional `comtypes` only when invoked).
 2. **No hardcoded personal paths or secrets**: Never hardcode drive paths (`C:\...`, `D:\...`, `E:\...`) or license filenames in source files. All paths flow through `creobuild_env.py` and gitignored `creobuild.local.json`.
 3. **Unicode / spaces path safety**: Never serialize file paths with `encoding="ascii"`; keep `compile_dll` invoking `cl.exe`/`link.exe` directly with captured `msvc_env`.
 4. **Human-Like Model Tree Design (拟人化模型树)**:
-   - Every generated model must remain clean and editable by CAD engineers in Creo UI: minimal datum skeletons, native single-feature evolution (`rotational_blend` / `helical_sweep` / `revolve` / `extrude` instead of dozens of discrete loft datum planes), natural order (base solid -> cuts -> `round`/`chamfer` -> `feature_group`/`axis_pattern` -> feature-scoped `set_appearance`), and no `Note_` clutter on assembly components (`rename_component_feature: false`).
+   - Every generated model must remain clean and editable by CAD engineers in Creo UI: minimal datum skeletons, native single-feature evolution (`rotational_blend` / `helical_sweep` / `revolve` / `extrude` instead of dozens of discrete loft datum planes), natural order (base solid -> cuts -> `round`/`chamfer` -> `feature_group`/`axis_pattern` -> feature-scoped `set_appearance`), `hide_auxiliary_layers` persistent hiding for clean deliverable trees, and no `Note_` clutter on assembly components (`rename_component_feature: false`).
 5. **Pro/TOOLKIT Engine Rules (`src_c/`)**:
-   - `creo_auto_modeler.cpp` & `creo_plan_core.hpp` must keep Sketch Intent Manager ordering (`ModeSet(TRUE)` -> entities/constraints/dims -> `ModeSet(FALSE)` -> `ProSectionAutodim` -> `ProSectionRegenerate`), `PRO_FEAT_PATTERN_HEAD` checks, `ProMdlVisibleSideTexturepropsSet` before `ProMdlVisibleSideTextureplacementpropsSet`, `ProSectionEpsilonSet` + `SketchEntityCache` for `rotational_blend`, and active-window guarantees for interactive/mechanism plans.
+   - `creo_auto_modeler.cpp` & `creo_plan_core.hpp` must keep Sketch Intent Manager ordering (`ModeSet(TRUE)` -> entities/constraints/dims -> `ModeSet(FALSE)` -> `ProSectionAutodim` -> `ProSectionRegenerate`), `PRO_FEAT_PATTERN_HEAD` checks, `ProMdlVisibleSideTexturepropsSet` before `ProMdlVisibleSideTextureplacementpropsSet`, `ProSectionEpsilonSet` + `SketchEntityCache` for `rotational_blend`, `hide_auxiliary_ref_features` (`ProModelitemHide` + `ProLayerDisplaystatusSave`), and active-window guarantees for interactive/mechanism plans.
 6. **Dual-phase verification**: Any modeling change must verify both `build` and isolated `verify` reopen (`PRO_REGEN_FORCE_REGEN`) with zero `!%CE`, `!%CW`, `失序`, or `out of sequence` lines in `trail.txt.*`.
 7. **Clean unit tests**: Run `python -m unittest discover -s tests -v` after editing Python modules.

@@ -20,6 +20,7 @@ import argparse
 import contextlib
 import ctypes
 import math
+import os
 import pathlib
 import random
 import shutil
@@ -1122,15 +1123,26 @@ class UIADriver:
 
 
 def find_ffmpeg_exe() -> str:
+    env_ff = os.environ.get("FFMPEG_PATH", "").strip()
+    if env_ff and pathlib.Path(env_ff).is_file():
+        return env_ff
     on_path = shutil.which("ffmpeg")
     if on_path:
         return on_path
+    script_path = pathlib.Path(__file__).resolve()
+    candidates = [
+        script_path.parents[1] / ".tools" / "ffmpeg" / "bin" / "ffmpeg.exe",
+        pathlib.Path(script_path.anchor) / "Tools" / "ffmpeg" / "bin" / "ffmpeg.exe",
+    ]
+    for cand in candidates:
+        if cand.is_file():
+            return str(cand)
     winget_root = pathlib.Path.home() / "AppData" / "Local" / "Microsoft" / "WinGet"
     if winget_root.is_dir():
         for p in winget_root.rglob("ffmpeg.exe"):
             if p.is_file():
                 return str(p)
-    raise FileNotFoundError("ffmpeg.exe not found on PATH or under LocalAppData WinGet")
+    raise FileNotFoundError("ffmpeg.exe not found on PATH, Tools/ffmpeg, or LocalAppData WinGet")
 
 
 class FFmpegRecorder:

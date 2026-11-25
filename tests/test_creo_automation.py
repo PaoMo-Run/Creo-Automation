@@ -23,6 +23,7 @@ import creobuild_env
 import human_ui
 import install_portable_msvc
 import probe_creo_ui
+import setup as creobuild_setup
 
 
 def _make_mock_creo_tree(root: Path, *, with_sdk: bool = True, psf_license: str = "7788@localhost") -> Path:
@@ -295,6 +296,7 @@ class TestHumanUiAndStageHelpers(unittest.TestCase):
         raw = {
             "part_name": "demo_asm",
             "doc_type": "assembly",
+            "default_view_camera": {"look_from": [0.72, 0.30, -0.69], "up": [0.0, 1.0, 0.0]},
             "motors": [{"name": "m1"}],
             "mechanism_analysis": True,
             "export_mech_end_view": True,
@@ -305,7 +307,45 @@ class TestHumanUiAndStageHelpers(unittest.TestCase):
         self.assertFalse(cleaned["mechanism_analysis"])
         self.assertFalse(cleaned["export_mech_end_view"])
         self.assertFalse(cleaned["hide_datums_in_views"])
+        self.assertEqual(cleaned["default_view_camera"], raw["default_view_camera"])
         self.assertIn("motors", raw)
+
+    def test_human_curve_overshoot_and_mouse_self_test(self) -> None:
+        rate, short_over, max_err = human_ui.run_mouse_self_test(
+            seed=20261125,
+            overshoot_prob=0.30,
+            virtual_bounds=(0, 0, 1920, 1080),
+        )
+        self.assertEqual(short_over, 0)
+        self.assertLess(max_err, 1e-6)
+        self.assertGreaterEqual(rate, 0.18)
+        self.assertLessEqual(rate, 0.45)
+
+    def test_drawing_plan_detection_and_make_gb_dtl(self) -> None:
+        dwg_plan = ROOT / "plans" / "dwg_flanged_hub.json"
+        self.assertTrue(dwg_plan.is_file())
+        data = json.loads(dwg_plan.read_text(encoding="utf-8"))
+        self.assertTrue(build_cpp.is_drawing_plan(data))
+        self.assertEqual(data["model_name"], "flanged_hub")
+        with tempfile.TemporaryDirectory() as td:
+            iso = Path(td) / "iso_mm.dtl"
+            iso.write_text("projection_type THIRD_ANGLE\ndefault_font font\n", encoding="utf-8")
+            gb = build_cpp.make_gb_dtl(Path(td), iso, font_name="chfntf")
+            txt = gb.read_text(encoding="utf-8")
+            self.assertIn("projection_type FIRST_ANGLE", txt)
+            self.assertIn("default_font chfntf", txt)
+            self.assertIn("symbol_font LEGACY", txt)
+
+    def test_install_skill_globally_installs_all_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            installed = creobuild_setup.install_skill_globally("antigravity", home=Path(td))
+            names = sorted(p.name for p in installed)
+            self.assertEqual(
+                names,
+                ["creo-engineering-drawing", "creo-parametric-automation", "creo-ui-demo-recording"],
+            )
+            for p in installed:
+                self.assertTrue((p / "SKILL.md").is_file())
 
 
 if __name__ == "__main__":

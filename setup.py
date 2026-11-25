@@ -17,7 +17,7 @@ from creobuild_env import (
     save_local_config,
 )
 
-SKILL_SRC = ROOT / ".agents" / "skills" / "creo-parametric-automation"
+SKILLS_DIR = ROOT / ".agents" / "skills"
 
 
 def print_human_report(diag: dict) -> None:
@@ -48,25 +48,30 @@ def print_human_report(diag: dict) -> None:
     print(f"\nOverall status   : {'READY' if diag['ready'] else 'NEEDS SETUP'}")
 
 
-def install_skill_globally(target: str) -> list[Path]:
-    """Copy the repository Creo automation skill into user-level AI agent skill directories."""
-    if not (SKILL_SRC / "SKILL.md").is_file():
-        raise FileNotFoundError(f"Repository skill not found at {SKILL_SRC}")
+def install_skill_globally(target: str, home: Path | None = None) -> list[Path]:
+    """Copy all repository Creo skills (.agents/skills/*) into user-level AI agent skill directories."""
+    if not SKILLS_DIR.is_dir():
+        raise FileNotFoundError(f"Repository skills directory not found at {SKILLS_DIR}")
+    skill_dirs = sorted(p for p in SKILLS_DIR.iterdir() if p.is_dir() and (p / "SKILL.md").is_file())
+    if not skill_dirs:
+        raise FileNotFoundError(f"No skills with SKILL.md found under {SKILLS_DIR}")
 
-    home = Path.home()
+    base_home = home if home is not None else Path.home()
     targets_map = {
-        "antigravity": home / ".gemini" / "config" / "skills" / "creo-parametric-automation",
-        "claude": home / ".claude" / "skills" / "creo-parametric-automation",
-        "codex": home / ".codex" / "skills" / "creo-parametric-automation",
+        "antigravity": base_home / ".gemini" / "config" / "skills",
+        "claude": base_home / ".claude" / "skills",
+        "codex": base_home / ".codex" / "skills",
     }
     selected = list(targets_map.values()) if target == "all" else [targets_map[target]]
     installed: list[Path] = []
-    for dst in selected:
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        if dst.exists():
-            shutil.rmtree(dst)
-        shutil.copytree(SKILL_SRC, dst)
-        installed.append(dst)
+    for root_dst in selected:
+        root_dst.mkdir(parents=True, exist_ok=True)
+        for src_skill in skill_dirs:
+            dst = root_dst / src_skill.name
+            if dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(src_skill, dst)
+            installed.append(dst)
     return installed
 
 
@@ -194,7 +199,7 @@ def main() -> int:
     if args.install_skill:
         paths = install_skill_globally(args.install_skill)
         for p in paths:
-            print(f"[skill] Installed creo-parametric-automation to: {p}")
+            print(f"[skill] Installed {p.name} to: {p}")
 
     if not any((args.check, args.auto, args.save, args.install_msvc, args.smoke_test, args.install_skill)) and sys.stdin.isatty():
         return interactive_wizard(args)

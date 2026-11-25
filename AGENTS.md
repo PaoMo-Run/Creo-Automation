@@ -44,7 +44,9 @@ If a user sent you this GitHub URL and asked you to **deploy, set up, or run Cre
 
 ## 2. Where Modeling Knowledge Lives
 
-- Read `.agents/skills/creo-parametric-automation/SKILL.md` (alongside `references/feature_mirror_workflow.md` and `references/mechanism_ui_video_recording.md`) for Pro/TOOLKIT constraints, 7-step workflow, simulated manual mirroring, persistent auxiliary hiding, and desktop UI/FFmpeg recording guidelines.
+- Read `.agents/skills/creo-parametric-automation/SKILL.md` (and `references/feature_mirror_workflow.md`) for 3D Pro/TOOLKIT constraints, 7-step workflow, simulated manual mirroring, `default_view_camera`, and `hide_auxiliary_layers`.
+- Read `.agents/skills/creo-engineering-drawing/SKILL.md` for the GB/T A3 2D drawing engine (`creo_drawing_engine.hpp`, four-pass views, `chfntf`, PDF/DWG exports).
+- Read `.agents/skills/creo-ui-demo-recording/SKILL.md` for desktop UI demo automation (`scripts/human_ui.py`, `scripts/probe_creo_ui.py`, Bezier/overshoot cursor, `Ctrl+Middle` zoom, Win11 MS Pinyin, `F2` pause & FFmpeg concat).
 - Read `docs/PLAN_SCHEMA.md` before creating or editing any JSON plan under `plans/`.
 - Read `docs/TROUBLESHOOTING.md` if Creo setup, unlocking, or regeneration fails.
 
@@ -58,6 +60,6 @@ If a user sent you this GitHub URL and asked you to **deploy, set up, or run Cre
 4. **Human-Like Model Tree Design (拟人化模型树)**:
    - Every generated model must remain clean and editable by CAD engineers in Creo UI: minimal datum skeletons, native single-feature evolution (`rotational_blend` / `helical_sweep` / `revolve` / `extrude` instead of dozens of discrete loft datum planes), natural order (base solid -> cuts -> `round`/`chamfer` -> `feature_group`/`axis_pattern` -> feature-scoped `set_appearance`), `hide_auxiliary_layers` persistent hiding for clean deliverable trees, and no `Note_` clutter on assembly components (`rename_component_feature: false`).
 5. **Pro/TOOLKIT Engine Rules (`src_c/`)**:
-   - `creo_auto_modeler.cpp` & `creo_plan_core.hpp` must keep Sketch Intent Manager ordering (`ModeSet(TRUE)` -> entities/constraints/dims -> `ModeSet(FALSE)` -> `ProSectionAutodim` -> `ProSectionRegenerate`), `PRO_FEAT_PATTERN_HEAD` checks, `ProMdlVisibleSideTexturepropsSet` before `ProMdlVisibleSideTextureplacementpropsSet`, `ProSectionEpsilonSet` + `SketchEntityCache` for `rotational_blend`, `hide_auxiliary_ref_features` (`ProModelitemHide` + `ProLayerDisplaystatusSave`), and active-window guarantees for interactive/mechanism plans.
+   - `creo_auto_modeler.cpp` & `creo_plan_core.hpp` & `creo_drawing_engine.hpp` must keep Sketch Intent Manager ordering (`ModeSet(TRUE)` -> entities/constraints/dims -> `ModeSet(FALSE)` -> `ProSectionAutodim` -> `ProSectionRegenerate`), `PRO_FEAT_PATTERN_HEAD` checks, `ProMdlVisibleSideTexturepropsSet` before `ProMdlVisibleSideTextureplacementpropsSet`, `ProSectionEpsilonSet` + `SketchEntityCache` for `rotational_blend`, `hide_auxiliary_ref_features` (`ProModelitemHide` + `ProLayerDisplaystatusSave`), `apply_plan_default_view`, four-pass 2D drawing view ordering with CLI `.drw.1` context, and active-window guarantees for interactive/mechanism plans.
 6. **Dual-phase verification**: Any modeling change must verify both `build` and isolated `verify` reopen (`PRO_REGEN_FORCE_REGEN`) with zero `!%CE`, `!%CW`, `失序`, or `out of sequence` lines in `trail.txt.*`.
 7. **Clean unit tests**: Run `python -m unittest discover -s tests -v` after editing Python modules.

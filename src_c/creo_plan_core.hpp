@@ -2162,6 +2162,97 @@ inline ProError export_view_jpg(ProMdl mdl, int win_id, const wchar_t *view_name
         win_id, PRORASTERDEPTH_24, 10.0, 7.5, PRORASTERDPI_200, PRORASTERTYPE_JPEG, const_cast<wchar_t *>(out_file));
 }
 
+inline ProError apply_plan_default_view(FILE *log, ProMdl mdl, int win_id, const Json &plan) {
+    if (!mdl || !plan.contains("default_view_camera") || !plan["default_view_camera"].is_object()) {
+        return PRO_TK_NO_ERROR;
+    }
+    const Json &cam = plan["default_view_camera"];
+    const Json &lf = cam.at("look_from");
+    double sz[3] = {lf.at(0).get<double>(), lf.at(1).get<double>(), lf.at(2).get<double>()};
+    double up[3] = {0.0, 1.0, 0.0};
+    if (cam.contains("up")) {
+        up[0] = cam["up"].at(0).get<double>();
+        up[1] = cam["up"].at(1).get<double>();
+        up[2] = cam["up"].at(2).get<double>();
+    }
+    double sz_len = std::sqrt(sz[0] * sz[0] + sz[1] * sz[1] + sz[2] * sz[2]);
+    if (sz_len < 1e-9) return PRO_TK_BAD_INPUTS;
+    for (int i = 0; i < 3; ++i) sz[i] /= sz_len;
+
+    // sx = normalize(up x sz), sy = sz x sx
+    double sx[3] = {
+        up[1] * sz[2] - up[2] * sz[1],
+        up[2] * sz[0] - up[0] * sz[2],
+        up[0] * sz[1] - up[1] * sz[0],
+    };
+    double sx_len = std::sqrt(sx[0] * sx[0] + sx[1] * sx[1] + sx[2] * sx[2]);
+    if (sx_len < 1e-9) return PRO_TK_BAD_INPUTS;
+    for (int i = 0; i < 3; ++i) sx[i] /= sx_len;
+
+    double sy[3] = {
+        sz[1] * sx[2] - sz[2] * sx[1],
+        sz[2] * sx[0] - sz[0] * sx[2],
+        sz[0] * sx[1] - sz[1] * sx[0],
+    };
+
+    // Row-vector convention: p_screen = p_model * vm -> columns are sx, sy, sz
+    ProMatrix vm{};
+    for (int r = 0; r < 4; ++r)
+        for (int c = 0; c < 4; ++c)
+            vm[r][c] = (r == c) ? 1.0 : 0.0;
+    for (int r = 0; r < 3; ++r) {
+        vm[r][0] = sx[r];
+        vm[r][1] = sy[r];
+        vm[r][2] = sz[r];
+    }
+
+    ProLine *vnames = nullptr;
+    ProLine *alt_names = nullptr;
+    int vcnt = 0;
+    if (ProViewNamesGet(mdl, &vnames, &alt_names, &vcnt) == PRO_TK_NO_ERROR) {
+        std::string joined;
+        for (int i = 0; i < vcnt; ++i) {
+            if (i > 0) joined += ",";
+            joined += w2utf8(vnames[i]);
+        }
+        log_printf(log, "DEFAULT_VIEW_EXISTING count=%d names=[%s]\n", vcnt, joined.c_str());
+        if (vnames) ProArrayFree(reinterpret_cast<ProArray *>(&vnames));
+        if (alt_names) ProArrayFree(reinterpret_cast<ProArray *>(&alt_names));
+    }
+
+    ProError st_set = ProViewMatrixSet(mdl, nullptr, vm);
+    if (win_id != PRO_VALUE_UNUSED) {
+        ProWindowCurrentSet(win_id);
+        ProWindowRefit(win_id);
+        ProWindowRepaint(win_id);
+    } else {
+        ProViewRefit(mdl, nullptr);
+    }
+
+    ProError st_def_mat = PRO_TK_E_NOT_FOUND;
+    ProError st_def_store = PRO_TK_NO_ERROR;
+    if (cam.value("store_as_default", true)) {
+        ProLine def_nm{};
+        wcscpy_s(def_nm, PRO_LINE_SIZE, L"DEFAULT");
+        ProView def_v = nullptr;
+        if (ProViewNameToView(mdl, def_nm, &def_v) == PRO_TK_NO_ERROR && def_v) {
+            st_def_mat = ProViewMatrixSet(mdl, def_v, vm);
+        }
+        ProView stored_v = nullptr;
+        st_def_store = ProViewStore(mdl, def_nm, &stored_v);
+        ProView cur_v = nullptr;
+        ProViewRetrieve(mdl, def_nm, &cur_v);
+        if (win_id != PRO_VALUE_UNUSED) {
+            ProWindowRefit(win_id);
+            ProWindowRepaint(win_id);
+        }
+    }
+    log_printf(log, "DEFAULT_VIEW_APPLIED set_st=%d def_mat_st=%d store_st=%d look=(%.3f,%.3f,%.3f)\n",
+               static_cast<int>(st_set), static_cast<int>(st_def_mat), static_cast<int>(st_def_store),
+               sz[0], sz[1], sz[2]);
+    return st_set;
+}
+
 struct AuxHideCtx {
     ProMdl mdl = nullptr;
     FILE *log = nullptr;

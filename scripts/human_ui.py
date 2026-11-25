@@ -243,6 +243,14 @@ def _min_jerk(t: float) -> float:
     return t * t * t * (10.0 - 15.0 * t + 6.0 * t * t)
 
 
+def _human_ease(t: float, skew: float = 0.0) -> float:
+    """Asymmetric minimum-jerk easing: faster initial ballistic push, slower aiming deceleration."""
+    t = max(0.0, min(1.0, t))
+    if abs(skew) > 1e-4:
+        t = t ** (1.0 + skew)
+    return _min_jerk(t)
+
+
 def _cubic_bezier(
     p0: tuple[float, float],
     p1: tuple[float, float],
@@ -259,6 +267,119 @@ def _cubic_bezier(
         b0 * p0[0] + b1 * p1[0] + b2 * p2[0] + b3 * p3[0],
         b0 * p0[1] + b1 * p1[1] + b2 * p2[1] + b3 * p3[1],
     )
+
+
+def _clamp_to_virtual_screen(
+    x: float,
+    y: float,
+    virtual_bounds: Optional[tuple[int, int, int, int]] = None,
+) -> tuple[int, int]:
+    if virtual_bounds is None:
+        _require_win32()
+        v_left = int(user32.GetSystemMetrics(76))
+        v_top = int(user32.GetSystemMetrics(77))
+        v_w = max(1, int(user32.GetSystemMetrics(78)))
+        v_h = max(1, int(user32.GetSystemMetrics(79)))
+    else:
+        v_left, v_top, v_w, v_h = virtual_bounds
+    cx = max(v_left + 4, min(v_left + max(1, v_w) - 5, int(round(x))))
+    cy = max(v_top + 4, min(v_top + max(1, v_h) - 5, int(round(y))))
+    return cx, cy
+
+
+def plan_human_curve(
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+    rng: random.Random,
+    dur_hint: Optional[float] = None,
+    precision: bool = False,
+) -> dict[str, Any]:
+    """
+    Build randomized C/S cubic-Bezier + dual-harmonic lateral hand drift parameters.
+    Converges smoothly to exact (x1, y1) at u=1.0 so click accuracy is preserved.
+    """
+    dx = float(x1 - x0)
+    dy = float(y1 - y0)
+    dist = math.hypot(dx, dy)
+    if dur_hint is None:
+        base = 0.20 + 0.00046 * dist + rng.uniform(-0.04, 0.09)
+        dur = max(0.22, min(1.15, base))
+    else:
+        dur = max(0.14, float(dur_hint))
+
+    if dist < 2.0:
+        return {
+            "dist": dist,
+            "p0": (float(x0), float(y0)),
+            "c1": (float(x0), float(y0)),
+            "c2": (float(x1), float(y1)),
+            "p3": (float(x1), float(y1)),
+            "dur": dur,
+            "nx": 0.0,
+            "ny": 0.0,
+            "a1": 0.0,
+            "f1": 1.0,
+            "ph1": 0.0,
+            "a2": 0.0,
+            "f2": 2.0,
+            "ph2": 0.0,
+            "skew": 0.0,
+        }
+
+    ux, uy = dx / dist, dy / dist
+    nx, ny = -uy, ux
+
+    if precision:
+        arc_scale = rng.uniform(0.04, 0.11)
+        arc_cap = 32.0
+        sway_max = min(2.2, dist * 0.015)
+    else:
+        arc_scale = rng.uniform(0.10, 0.25)
+        arc_cap = 145.0
+        sway_max = min(8.5, max(1.2, dist * 0.018))
+
+    sign = rng.choice([-1.0, 1.0])
+    arc = min(arc_cap, dist * arc_scale) * sign
+    c2_factor = rng.uniform(-0.45, 0.65)
+    c1 = (
+        x0 + dx * rng.uniform(0.18, 0.38) + nx * arc * rng.uniform(0.65, 1.15),
+        y0 + dy * rng.uniform(0.18, 0.38) + ny * arc * rng.uniform(0.65, 1.15),
+    )
+    c2 = (
+        x0 + dx * rng.uniform(0.62, 0.84) + nx * arc * c2_factor,
+        y0 + dy * rng.uniform(0.62, 0.84) + ny * arc * c2_factor,
+    )
+    return {
+        "dist": dist,
+        "p0": (float(x0), float(y0)),
+        "c1": c1,
+        "c2": c2,
+        "p3": (float(x1), float(y1)),
+        "dur": dur,
+        "nx": nx,
+        "ny": ny,
+        "a1": rng.uniform(0.45, 1.0) * sway_max * rng.choice([-1.0, 1.0]),
+        "f1": rng.uniform(1.1, 2.3),
+        "ph1": rng.uniform(0.0, math.tau),
+        "a2": rng.uniform(0.18, 0.45) * sway_max * rng.choice([-1.0, 1.0]),
+        "f2": rng.uniform(2.8, 5.2),
+        "ph2": rng.uniform(0.0, math.tau),
+        "skew": rng.uniform(-0.18, 0.04),
+    }
+
+
+def eval_human_curve(spec: dict[str, Any], t_norm: float) -> tuple[float, float]:
+    """Evaluate a planned human curve at normalized time t_norm in [0, 1]."""
+    u = _human_ease(t_norm, spec["skew"])
+    bx, by = _cubic_bezier(spec["p0"], spec["c1"], spec["c2"], spec["p3"], u)
+    env = math.sin(math.pi * max(0.0, min(1.0, u))) ** 1.2
+    wobble = env * (
+        spec["a1"] * math.sin(math.tau * spec["f1"] * u + spec["ph1"])
+        + spec["a2"] * math.sin(math.tau * spec["f2"] * u + spec["ph2"])
+    )
+    return bx + spec["nx"] * wobble, by + spec["ny"] * wobble
 
 
 def clamp_capture_rect(
@@ -533,12 +654,22 @@ class PauseController:
 class HumanDriver:
     """Simulated human mouse & keyboard interaction driver."""
 
-    def __init__(self, seed: int = 20261123, pause_ctrl: Optional[PauseController] = None) -> None:
-        self.rng = random.Random(seed)
+    def __init__(
+        self,
+        seed: Optional[int] = None,
+        pause_ctrl: Optional[PauseController] = None,
+        overshoot_prob: float = 0.30,
+        overshoot_min_dist: float = 140.0,
+    ) -> None:
+        self.rng = random.Random(seed) if seed is not None else random.Random()
         self.prefer_win_space = False
         self.zh_needs_shift = False
         self.zh_strategy: Optional[str] = None
         self.pause_ctrl = pause_ctrl
+        self.overshoot_prob = max(0.0, min(0.8, float(overshoot_prob)))
+        self.overshoot_min_dist = float(overshoot_min_dist)
+        self.overshoot_count = 0
+        self.move_count = 0
 
     def _sleep(self, seconds: float) -> float:
         if self.pause_ctrl is not None:
@@ -554,67 +685,111 @@ class HumanDriver:
     def pause(self, low_s: float = 0.18, high_s: float = 0.35) -> None:
         self._sleep(self.rng.uniform(low_s, high_s))
 
-    def move_to(self, tx: int, ty: int, duration: Optional[float] = None, jitter_px: int = 1) -> None:
-        self._wait_if_paused()
+    def _glide_segment(
+        self,
+        tx: int,
+        ty: int,
+        duration: Optional[float] = None,
+        precision: bool = False,
+    ) -> None:
         sx, sy = get_cursor_pos()
-        tx_j = int(tx + self.rng.randint(-jitter_px, jitter_px)) if jitter_px > 0 else int(tx)
-        ty_j = int(ty + self.rng.randint(-jitter_px, jitter_px)) if jitter_px > 0 else int(ty)
-
-        def build_curve(
-            x0: int, y0: int, dur_hint: Optional[float]
-        ) -> tuple[float, tuple[float, float], tuple[float, float], float]:
-            dx = float(tx_j - x0)
-            dy = float(ty_j - y0)
-            dist = math.hypot(dx, dy)
-            if dur_hint is None:
-                dur = max(0.24, min(1.10, 0.20 + 0.00048 * dist + self.rng.uniform(-0.04, 0.08)))
-            else:
-                dur = max(0.16, dur_hint)
-            if dist < 2.0:
-                return dist, (float(x0), float(y0)), (float(tx_j), float(ty_j)), dur
-            ux, uy = dx / dist, dy / dist
-            nx, ny = -uy, ux
-            arc = min(90.0, dist * self.rng.uniform(0.06, 0.16)) * self.rng.choice([-1.0, 1.0])
-            cp1 = (
-                x0 + dx * self.rng.uniform(0.22, 0.36) + nx * arc * self.rng.uniform(0.6, 1.1),
-                y0 + dy * self.rng.uniform(0.22, 0.36) + ny * arc * self.rng.uniform(0.6, 1.1),
-            )
-            cp2 = (
-                x0 + dx * self.rng.uniform(0.65, 0.82) + nx * arc * self.rng.uniform(-0.35, 0.55),
-                y0 + dy * self.rng.uniform(0.65, 0.82) + ny * arc * self.rng.uniform(-0.35, 0.55),
-            )
-            return dist, cp1, cp2, dur
-
-        dist, c1, c2, duration = build_curve(sx, sy, duration)
-        if dist < 2.0:
-            _mouse_event(0, tx_j, ty_j, move=True)
+        spec = plan_human_curve(sx, sy, tx, ty, self.rng, dur_hint=duration, precision=precision)
+        if spec["dist"] < 2.0:
+            _mouse_event(0, tx, ty, move=True)
             return
 
         step_s = 0.008  # ~125 Hz pointer updates
         t0 = time.perf_counter()
+        dur = float(spec["dur"])
         while True:
             paused_s = self._wait_if_paused()
             if paused_s > 0.0:
-                rem = max(0.20, duration - (time.perf_counter() - t0 - paused_s))
+                rem = max(0.18, dur - (time.perf_counter() - t0 - paused_s))
                 sx, sy = get_cursor_pos()
-                dist, c1, c2, duration = build_curve(sx, sy, rem)
-                if dist < 2.0:
+                spec = plan_human_curve(sx, sy, tx, ty, self.rng, dur_hint=rem, precision=precision)
+                if spec["dist"] < 2.0:
                     break
+                dur = float(spec["dur"])
                 t0 = time.perf_counter()
             elapsed = time.perf_counter() - t0
-            if elapsed >= duration:
+            if elapsed >= dur:
                 break
-            u = _min_jerk(elapsed / duration)
-            px, py = _cubic_bezier((float(sx), float(sy)), c1, c2, (float(tx_j), float(ty_j)), u)
+            px, py = eval_human_curve(spec, elapsed / dur)
             _mouse_event(0, int(round(px)), int(round(py)), move=True)
             time.sleep(step_s)
-        _mouse_event(0, tx_j, ty_j, move=True)
+        _mouse_event(0, tx, ty, move=True)
+
+    def plan_overshoot_point(
+        self,
+        sx: int,
+        sy: int,
+        tx: int,
+        ty: int,
+        virtual_bounds: Optional[tuple[int, int, int, int]] = None,
+    ) -> Optional[tuple[int, int]]:
+        """Decide whether a long move overshoots past (tx, ty) and return the overshoot waypoint."""
+        dx = float(tx - sx)
+        dy = float(ty - sy)
+        dist = math.hypot(dx, dy)
+        if dist < self.overshoot_min_dist or self.overshoot_prob <= 0.0:
+            return None
+        if self.rng.random() >= self.overshoot_prob:
+            return None
+        ux, uy = dx / dist, dy / dist
+        nx, ny = -uy, ux
+        over_len = self.rng.uniform(15.0, min(38.0, dist * 0.14))
+        lat_off = self.rng.uniform(-11.0, 11.0)
+        ox, oy = _clamp_to_virtual_screen(
+            tx + ux * over_len + nx * lat_off,
+            ty + uy * over_len + ny * lat_off,
+            virtual_bounds=virtual_bounds,
+        )
+        if math.hypot(ox - tx, oy - ty) < 8.0:
+            return None
+        return ox, oy
+
+    def move_to(
+        self,
+        tx: int,
+        ty: int,
+        duration: Optional[float] = None,
+        jitter_px: int = 1,
+        allow_overshoot: bool = True,
+        precision: bool = False,
+    ) -> None:
+        self._wait_if_paused()
+        self.move_count += 1
+        sx, sy = get_cursor_pos()
+        j = 0 if precision else jitter_px
+        tx_j = int(tx + self.rng.randint(-j, j)) if j > 0 else int(tx)
+        ty_j = int(ty + self.rng.randint(-j, j)) if j > 0 else int(ty)
+
+        over_pt = None
+        if allow_overshoot and not precision:
+            over_pt = self.plan_overshoot_point(sx, sy, tx_j, ty_j)
+
+        if over_pt is not None:
+            self.overshoot_count += 1
+            ox, oy = over_pt
+            swing_dur = None if duration is None else max(0.18, duration * 0.84)
+            self._glide_segment(ox, oy, duration=swing_dur, precision=False)
+            self._sleep(self.rng.uniform(0.045, 0.095))
+            pull_dur = self.rng.uniform(0.14, 0.25)
+            self._glide_segment(tx_j, ty_j, duration=pull_dur, precision=True)
+        else:
+            self._glide_segment(tx_j, ty_j, duration=duration, precision=precision)
         self.pause(0.05, 0.12)
 
     def click_at(
-        self, tx: int, ty: int, button: str = "left", duration: Optional[float] = None, double: bool = False
+        self,
+        tx: int,
+        ty: int,
+        button: str = "left",
+        duration: Optional[float] = None,
+        double: bool = False,
+        precision: bool = False,
     ) -> None:
-        self.move_to(tx, ty, duration=duration)
+        self.move_to(tx, ty, duration=duration, allow_overshoot=not precision, precision=precision)
         self._wait_if_paused()
         if button == "left":
             down, up = MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP
@@ -632,48 +807,152 @@ class HumanDriver:
                 time.sleep(self.rng.uniform(0.08, 0.13))
         self.pause(0.14, 0.28)
 
+    def _send_vk_state(self, vk: int, down: bool) -> None:
+        _require_win32()
+        scan = user32.MapVirtualKeyW(vk, 0)
+        flags = 0 if down else KEYEVENTF_KEYUP
+        _send_inputs(
+            [INPUT(type=INPUT_KEYBOARD, union=_INPUT_UNION(ki=KEYBDINPUT(wVk=vk, wScan=scan, dwFlags=flags, time=0, dwExtraInfo=0)))]
+        )
+
+    def drag_left(self, sx: int, sy: int, dx: int, dy: int, duration: float = 0.85) -> None:
+        """Smoothly drag a UI element / dialog title bar with left mouse button (pause-safe)."""
+        self.move_to(sx, sy, jitter_px=1, allow_overshoot=False, precision=True)
+        self._wait_if_paused()
+        _mouse_event(MOUSEEVENTF_LEFTDOWN)
+        left_down = True
+        try:
+            time.sleep(self.rng.uniform(0.07, 0.12))
+            cx0, cy0 = get_cursor_pos()
+            tx, ty = _clamp_to_virtual_screen(cx0 + dx, cy0 + dy)
+            spec = plan_human_curve(cx0, cy0, tx, ty, self.rng, dur_hint=duration, precision=True)
+            t0 = time.perf_counter()
+            while True:
+                if self.pause_ctrl is not None and self.pause_ctrl.is_pause_requested():
+                    _mouse_event(MOUSEEVENTF_LEFTUP)
+                    left_down = False
+                    elapsed_before = time.perf_counter() - t0
+                    self.pause_ctrl.wait_if_paused()
+                    rem_frac = max(0.0, 1.0 - min(1.0, elapsed_before / max(0.1, duration)))
+                    if rem_frac > 0.05:
+                        cur_x, cur_y = get_cursor_pos()
+                        self.drag_left(
+                            cur_x,
+                            cur_y,
+                            int(round(tx - cur_x)),
+                            int(round(ty - cur_y)),
+                            duration=max(0.25, duration * rem_frac),
+                        )
+                    return
+                elapsed = time.perf_counter() - t0
+                if elapsed >= duration:
+                    break
+                px, py = eval_human_curve(spec, elapsed / duration)
+                _mouse_event(0, int(round(px)), int(round(py)), move=True)
+                time.sleep(0.01)
+            _mouse_event(0, tx, ty, move=True)
+            time.sleep(self.rng.uniform(0.07, 0.12))
+        finally:
+            if left_down:
+                _mouse_event(MOUSEEVENTF_LEFTUP)
+        self.pause(0.16, 0.28)
+
+    def _drag_middle_with_mod(
+        self,
+        cx: int,
+        cy: int,
+        dx: int,
+        dy: int,
+        duration: float = 1.4,
+        mod_vk: Optional[int] = None,
+        strict_vertical: bool = False,
+    ) -> None:
+        """
+        Smoothly drag middle mouse button with optional modifier key (Ctrl=zoom, Shift=pan, None=orbit).
+        Guarantees both modifier key and middle mouse button are cleanly released on exception or pause.
+        """
+        self.move_to(cx, cy, jitter_px=4, allow_overshoot=True)
+        self._wait_if_paused()
+        mod_down = False
+        mid_down = False
+        try:
+            if mod_vk is not None:
+                self._send_vk_state(mod_vk, down=True)
+                mod_down = True
+                time.sleep(self.rng.uniform(0.06, 0.11))
+            _mouse_event(MOUSEEVENTF_MIDDLEDOWN)
+            mid_down = True
+            time.sleep(self.rng.uniform(0.07, 0.13))
+
+            sx, sy = get_cursor_pos()
+            tx, ty = _clamp_to_virtual_screen(sx + dx, sy + dy)
+            if strict_vertical:
+                spec = plan_human_curve(sx, sy, sx, ty, self.rng, dur_hint=duration, precision=True)
+                spec["c1"] = (sx + self.rng.uniform(-2.0, 2.0), sy + (ty - sy) * self.rng.uniform(0.25, 0.38))
+                spec["c2"] = (sx + self.rng.uniform(-2.0, 2.0), sy + (ty - sy) * self.rng.uniform(0.65, 0.80))
+                spec["a1"] *= 0.25
+                spec["a2"] *= 0.25
+            else:
+                spec = plan_human_curve(sx, sy, tx, ty, self.rng, dur_hint=duration, precision=False)
+
+            t0 = time.perf_counter()
+            while True:
+                if self.pause_ctrl is not None and self.pause_ctrl.is_pause_requested():
+                    _mouse_event(MOUSEEVENTF_MIDDLEUP)
+                    mid_down = False
+                    if mod_down and mod_vk is not None:
+                        time.sleep(0.03)
+                        self._send_vk_state(mod_vk, down=False)
+                        mod_down = False
+                    elapsed_before = time.perf_counter() - t0
+                    self.pause_ctrl.wait_if_paused()
+                    rem_frac = max(0.0, 1.0 - min(1.0, elapsed_before / max(0.1, duration)))
+                    if rem_frac > 0.05:
+                        self._drag_middle_with_mod(
+                            cx,
+                            cy,
+                            int(round(dx * rem_frac)),
+                            int(round(dy * rem_frac)),
+                            duration=max(0.3, duration * rem_frac),
+                            mod_vk=mod_vk,
+                            strict_vertical=strict_vertical,
+                        )
+                    return
+                elapsed = time.perf_counter() - t0
+                if elapsed >= duration:
+                    break
+                px, py = eval_human_curve(spec, elapsed / duration)
+                _mouse_event(0, int(round(px)), int(round(py)), move=True)
+                time.sleep(0.01)
+            _mouse_event(0, sx if strict_vertical else tx, ty, move=True)
+            time.sleep(self.rng.uniform(0.08, 0.15))
+        finally:
+            if mid_down:
+                _mouse_event(MOUSEEVENTF_MIDDLEUP)
+            if mod_down and mod_vk is not None:
+                time.sleep(0.04)
+                self._send_vk_state(mod_vk, down=False)
+        self.pause(0.20, 0.36)
+
     def drag_middle(self, cx: int, cy: int, dx: int, dy: int, duration: float = 1.4) -> None:
         """Smoothly orbit Creo 3D view using real middle-mouse drag."""
-        self.move_to(cx, cy, jitter_px=3)
+        self._drag_middle_with_mod(cx, cy, dx, dy, duration=duration, mod_vk=None, strict_vertical=False)
+
+    def ctrl_drag_middle(self, cx: int, cy: int, dy: int, duration: float = 1.35) -> None:
+        """
+        Smoothly zoom Creo 3D viewport using Ctrl + Middle Mouse vertical drag.
+        Creo convention: dy > 0 (drag DOWN) = Zoom OUT (panoramic); dy < 0 (drag UP) = Zoom IN.
+        """
+        self._drag_middle_with_mod(cx, cy, 0, dy, duration=duration, mod_vk=0xA2, strict_vertical=True)
+
+    def shift_drag_middle(self, cx: int, cy: int, dx: int, dy: int, duration: float = 1.05) -> None:
+        """Smoothly pan Creo 3D viewport using Shift + Middle Mouse drag."""
+        self._drag_middle_with_mod(cx, cy, dx, dy, duration=duration, mod_vk=0xA0, strict_vertical=False)
+
+    def send_ctrl_key(self, key_vk: int, settle_s: float = 0.45) -> None:
+        """Send a Ctrl+<key> shortcut cleanly (e.g. Ctrl+D = 0x44 to reset Creo DEFAULT view)."""
         self._wait_if_paused()
-        _mouse_event(MOUSEEVENTF_MIDDLEDOWN)
-        time.sleep(self.rng.uniform(0.08, 0.14))
-
-        sx, sy = get_cursor_pos()
-        tx, ty = sx + dx, sy + dy
-        dist = max(1.0, math.hypot(dx, dy))
-        nx, ny = -dy / dist, dx / dist
-        arc = min(32.0, dist * 0.08) * self.rng.choice([-1.0, 1.0])
-        c1 = (sx + dx * 0.30 + nx * arc, sy + dy * 0.30 + ny * arc)
-        c2 = (sx + dx * 0.72 + nx * arc * 0.5, sy + dy * 0.72 + ny * arc * 0.5)
-
-        t0 = time.perf_counter()
-        while True:
-            if self.pause_ctrl is not None and self.pause_ctrl.is_pause_requested():
-                _mouse_event(MOUSEEVENTF_MIDDLEUP)
-                elapsed_before = time.perf_counter() - t0
-                self.pause_ctrl.wait_if_paused()
-                rem_frac = max(0.0, 1.0 - min(1.0, elapsed_before / max(0.1, duration)))
-                if rem_frac > 0.05:
-                    self.drag_middle(
-                        cx,
-                        cy,
-                        int(round(dx * rem_frac)),
-                        int(round(dy * rem_frac)),
-                        duration=max(0.3, duration * rem_frac),
-                    )
-                return
-            elapsed = time.perf_counter() - t0
-            if elapsed >= duration:
-                break
-            u = _min_jerk(elapsed / duration)
-            px, py = _cubic_bezier((float(sx), float(sy)), c1, c2, (float(tx), float(ty)), u)
-            _mouse_event(0, int(round(px)), int(round(py)), move=True)
-            time.sleep(0.01)
-        _mouse_event(0, tx, ty, move=True)
-        time.sleep(self.rng.uniform(0.09, 0.16))
-        _mouse_event(MOUSEEVENTF_MIDDLEUP)
-        self.pause(0.22, 0.40)
+        self._send_chord(0xA2, key_vk, mod_ext=0, settle_s=settle_s)
 
     def scroll_wheel(self, cx: int, cy: int, total_notches: int, step_delay: float = 0.065) -> None:
         """Zoom smoothly in/out by sending discrete mouse-wheel ticks."""
@@ -1322,20 +1601,113 @@ class FFmpegRecorder:
             shutil.rmtree(self._segments_dir, ignore_errors=True)
 
 
+def drag_window_to(
+    driver: HumanDriver,
+    hw: int,
+    target_left: int,
+    target_top: int,
+    duration: float = 0.85,
+) -> tuple[int, int, int, int]:
+    """Smoothly drag a floating Creo popup dialog by its title bar to avoid blocking the 3D viewport."""
+    _require_win32()
+    rc = wt.RECT()
+    if not user32.GetWindowRect(hw, ctypes.byref(rc)):
+        return (target_left, target_top, target_left + 400, target_top + 400)
+    cur = (int(rc.left), int(rc.top), int(rc.right), int(rc.bottom))
+    dx = target_left - cur[0]
+    dy = target_top - cur[1]
+    if math.hypot(dx, dy) < 25.0:
+        return cur
+    bar_x = cur[0] + min(180, max(60, (cur[2] - cur[0]) // 3))
+    bar_y = cur[1] + 18
+    driver.drag_left(bar_x, bar_y, dx, dy, duration=max(0.35, duration))
+    time.sleep(0.18)
+    rc2 = wt.RECT()
+    if user32.GetWindowRect(hw, ctypes.byref(rc2)):
+        return (int(rc2.left), int(rc2.top), int(rc2.right), int(rc2.bottom))
+    return cur
+
+
+def run_mouse_self_test(
+    seed: Optional[int] = None,
+    overshoot_prob: float = 0.30,
+    virtual_bounds: tuple[int, int, int, int] = (0, 0, 1920, 1080),
+) -> tuple[float, int, float]:
+    """Verify randomized C/S curves, long-move overshoot rate, 0 short-click overshoot, and endpoint convergence."""
+    drv = HumanDriver(seed=seed, overshoot_prob=overshoot_prob)
+    long_trials = 200
+    long_over = 0
+    over_dists: list[float] = []
+    max_lat_devs: list[float] = []
+    endpoint_errs: list[float] = []
+    for _ in range(long_trials):
+        x0 = drv.rng.randint(100, 1700)
+        y0 = drv.rng.randint(100, 950)
+        dx = drv.rng.randint(-700, 700)
+        dy = drv.rng.randint(-450, 450)
+        if math.hypot(dx, dy) < 200:
+            dx = 450 if dx >= 0 else -450
+        x1, y1 = max(50, min(1900, x0 + dx)), max(50, min(1040, y0 + dy))
+        ov = drv.plan_overshoot_point(x0, y0, x1, y1, virtual_bounds=virtual_bounds)
+        if ov is not None:
+            long_over += 1
+            over_dists.append(math.hypot(ov[0] - x1, ov[1] - y1))
+        spec = plan_human_curve(x0, y0, x1, y1, drv.rng, precision=False)
+        d_seg = max(1.0, math.hypot(x1 - x0, y1 - y0))
+        ux, uy = (x1 - x0) / d_seg, (y1 - y0) / d_seg
+        lat_max = 0.0
+        for k in range(1, 40):
+            px, py = eval_human_curve(spec, k / 40.0)
+            lat = abs((px - x0) * (-uy) + (py - y0) * ux)
+            if lat > lat_max:
+                lat_max = lat
+        max_lat_devs.append(lat_max)
+        ex, ey = eval_human_curve(spec, 1.0)
+        endpoint_errs.append(math.hypot(ex - x1, ey - y1))
+
+    short_over = sum(
+        1
+        for _ in range(200)
+        if drv.plan_overshoot_point(500, 500, 560, 535, virtual_bounds=virtual_bounds) is not None
+    )
+    rate = long_over / long_trials
+    max_err = max(endpoint_errs)
+    med_lat = sorted(max_lat_devs)[len(max_lat_devs) // 2]
+    o_min = min(over_dists) if over_dists else 0.0
+    o_max = max(over_dists) if over_dists else 0.0
+    print(
+        f"[mouse-test] long_overshoot_rate={rate:.1%} ({long_over}/{long_trials}, target~{overshoot_prob:.0%}), "
+        f"overshoot_px=[{o_min:.1f}..{o_max:.1f}], median_lat_drift={med_lat:.1f}px, "
+        f"short_click_overshoot={short_over}/200, max_endpoint_err={max_err:.6f}px"
+    )
+    if short_over != 0:
+        raise AssertionError("Short precision moves must never overshoot!")
+    if max_err >= 1e-6:
+        raise AssertionError(f"Curve must converge to target endpoint (err={max_err})")
+    if overshoot_prob > 0.0 and not (0.18 <= rate <= 0.45):
+        raise AssertionError(f"Unexpected overshoot rate: {rate}")
+    return rate, short_over, max_err
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Human-like Windows UI & FFmpeg recording utilities")
     parser.add_argument("--test-ime", action="store_true", help="Run temporary Win32 EDIT MS Pinyin probe")
+    parser.add_argument("--test-mouse", action="store_true", help="Run randomized curve & overshoot self-test")
+    parser.add_argument("--seed", type=int, default=None, help="Optional RNG seed for --test-mouse")
+    parser.add_argument("--overshoot-prob", type=float, default=0.30, help="Long-move overshoot probability")
     parser.add_argument("--check-ffmpeg", action="store_true", help="Verify ffmpeg.exe discovery")
     args = parser.parse_args()
 
     if args.check_ffmpeg:
         print(f"FFMPEG_EXE={find_ffmpeg_exe()}")
+    if args.test_mouse:
+        run_mouse_self_test(seed=args.seed, overshoot_prob=args.overshoot_prob)
     if args.test_ime:
-        drv = HumanDriver()
+        drv = HumanDriver(seed=args.seed)
         ok, text, mode = drv.calibrate_ime_on_temp_window()
         print(f"IME_PROBE ok={ok} mode={mode} text={text!r}")
         return 0 if ok else 1
-    if not args.check_ffmpeg and not args.test_ime:
+    if not any((args.check_ffmpeg, args.test_ime, args.test_mouse)):
         parser.print_help()
     return 0
 

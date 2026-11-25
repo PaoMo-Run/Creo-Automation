@@ -6,12 +6,12 @@ description: >-
   complex solid & surface features (extrude, revolve, helical_sweep, rotational_blend,
   solid_blend, sweep, loft, mirror, pattern), mechanism joints (pin/slider/cylindrical),
   servo motors (PRO_FEAT_PM_MOTOR) & mechanism analysis, B-rep coloring & embedded cylindrical
-  textures, persistent auxiliary datum hiding (hide_auxiliary_layers), Windows UI/IME
-  Mechanism recording (scripts/human_ui.py), cross-environment setup, and isolated reopen
-  verification workflow.
+  textures, default_view_camera persistence, auxiliary datum hiding (hide_auxiliary_layers),
+  cross-environment setup, and isolated reopen verification workflow.
   Use when creating or modifying Creo 3D parts/assemblies automatically, debugging ProSection /
-  ElementTree / Asmcomp / Mechanism errors, setting up Pro/TOOLKIT + MSVC toolchains, or
-  automating human-like Creo UI demos and screen recordings.
+  ElementTree / Asmcomp / Mechanism errors, or setting up Pro/TOOLKIT + MSVC toolchains.
+  For GB/T 2D drawings use creo-engineering-drawing; for desktop UI automation & FFmpeg
+  recording use creo-ui-demo-recording.
 ---
 
 # Creo Parametric C++17 Pro/TOOLKIT Automated Modeling Guide
@@ -109,10 +109,11 @@ Every generated `.prt` / `.asm` must look as if authored by an experienced mecha
   - Keep collinear narrow rectangles per `IntentManager` sketch `<= 3` (split 4–5 into `2+2` or `3+2` to avoid `ProSectionAutodim st=-1 n_err=0`), keep sloped blend end-caps overlapping walls by `>= 0.5–2 mm`, and model directional text/numbers independently on each side rather than mirroring.
 - **Persistent Auxiliary Reference Hiding (`hide_auxiliary_layers`)**:
   - `DatumDisplayGuard` only toggles display options temporarily around `.jpg` export. To keep saved `.prt.1`/`.asm.1` models clean on reopen in default sessions, enable `"hide_auxiliary_layers": true` and `"keep_visible_features": [...]` (assemblies automatically retain `ASM_RIGHT/TOP/FRONT/DEF_CSYS`). `hide_auxiliary_ref_features` calls `ProModelitemHide` + `ProLayerDisplaystatusSave(mdl)` before `ProMdlSave`, and reopen verifies via `AUX_VERIFY_HIDDEN`.
-- **Desktop Mechanism UI Automation & FFmpeg Segmented Recording** (see [mechanism_ui_video_recording.md](./references/mechanism_ui_video_recording.md)):
-  - Separate execution modes: run builds/offline `PostMessageW` verification in agent terminals, and run real `SendInput` / Win11 MS Pinyin / FFmpeg `gdigrab` capture (`scripts/human_ui.py`, `scripts/probe_creo_ui.py`) on an unlocked interactive Windows desktop (`WinSta0\Default`) using the OS default locale without overriding `LANG`.
-  - Under Creo `HCS16139P` floating name boxes, **never switch to `0x0409` EN** (`type_ascii(..., switch_en=False)` uses `_vk_press` digits + `KEYEVENTF_UNICODE` punctuation while keeping `0x0804` intact); in Mechanism `单调` tables add rows one by one (`+`) and skip default `0` cells (`_is_zero_val`), binding popup `HWND` explicitly after layout settles and mapping `flip_dir: false` joints to UI **反向方向**.
-  - Protect short IME/dropdown actions with `PauseController.critical_section()` (`F2` hotkey), release middle-mouse drag immediately on pause, and concatenate segments losslessly via `FFmpegRecorder` (`-f concat -safe 0 -c copy`).
+- **Saved Default Isometric View (`default_view_camera`)**:
+  - Set `"default_view_camera": {"look_from": [...], "up": [...], "store_as_default": true}` on parts or assemblies to persist an exact opening orientation via row-vector column-basis `ProViewMatrixSet` + `ProWindowRefit` + `ProViewStore("DEFAULT")`. Isolated reopen logs `VERIFY_RAW_OPEN_VIEW` and captures `verify_open_raw.jpg` immediately on open.
+- **Dedicated Sub-Skills Routing**:
+  - **2D GB/T Engineering Drawings (`.drw.1` / `.pdf` / `.dwg`)**: see [creo-engineering-drawing](../creo-engineering-drawing/SKILL.md).
+  - **Desktop UI Mechanism Demos & Segmented Recording**: see [creo-ui-demo-recording](../creo-ui-demo-recording/SKILL.md).
 
 ---
 

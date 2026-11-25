@@ -1,0 +1,207 @@
+{
+  "doc_type": "drawing",
+  "model_name": "flanged_hub",
+  "drawing_name": "flanged_hub",
+  "model_plan": "plans/flanged_hub.json",
+  "template": "a3_drawing",
+  "font": "chfntf",
+  "sheet_scale": 1.0,
+  "density_g_cm3": 7.85,
+  "title_block": {
+    "part_title": "法兰轴套",
+    "drawing_no": "FH-001",
+    "material": "45",
+    "scale": "1:1",
+    "quantity": "1"
+  },
+  "xsections": [
+    {
+      "name": "A",
+      "plane": "RIGHT"
+    }
+  ],
+  "views": [
+    {
+      "id": "main_sec",
+      "type": "general",
+      "pos_mm": [145.0, 218.0],
+      "scale": 0.0,
+      "matrix3": [
+        [0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0]
+      ],
+      "display": "no_hidden",
+      "tangent_edges": "none",
+      "section": {
+        "name": "A",
+        "arrow_view_post": "top_view"
+      },
+      "move_center_mm": [145.0, 218.0]
+    },
+    {
+      "id": "top_view",
+      "type": "projected",
+      "parent": "main_sec",
+      "proj_dir": "below",
+      "proj_gap_mm": 55.0,
+      "pos_mm": [145.0, 118.0],
+      "move_center_mm": [145.0, 118.0],
+      "display": "no_hidden",
+      "tangent_edges": "none"
+    },
+    {
+      "id": "detail_seal",
+      "type": "detail",
+      "parent": "main_sec",
+      "pos_mm": [288.0, 224.0],
+      "move_center_mm": [288.0, 224.0],
+      "scale": 2.0,
+      "label": "I",
+      "circle_radius_mm": 8.0,
+      "ref": {
+        "kind": "surface",
+        "surf_kind": "cylinder",
+        "radius": 21.5,
+        "z_range": [31.5, 36.5],
+        "near": [0.0, 21.5, 34.0],
+        "pick_pt": [0.0, 21.5, 34.0]
+      },
+      "display": "no_hidden",
+      "tangent_edges": "none"
+    }
+  ],
+  "centerlines": [
+    {
+      "view": "main_sec",
+      "mode": "view_mid_v",
+      "extend_mm": 4.0
+    },
+    {
+      "view": "top_view",
+      "mode": "view_mid_h",
+      "extend_mm": 4.0
+    },
+    {
+      "view": "top_view",
+      "mode": "view_mid_v",
+      "extend_mm": 4.0
+    }
+  ],
+  "dimensions": [
+    {
+      "id": "H_total",
+      "view": "main_sec",
+      "orient": "vert",
+      "refs": [
+        { "kind": "surface", "surf_kind": "plane", "normal": [0.0, 0.0, 1.0], "plane_coord": 0.0, "near": [0.0, 40.0, 0.0] },
+        { "kind": "surface", "surf_kind": "plane", "normal": [0.0, 0.0, 1.0], "plane_coord": 48.0, "near": [0.0, 20.0, 48.0] }
+      ],
+      "pos_mm": [212.0, 218.0]
+    },
+    {
+      "id": "H_flange",
+      "view": "main_sec",
+      "orient": "vert",
+      "refs": [
+        { "kind": "surface", "surf_kind": "plane", "normal": [0.0, 0.0, 1.0], "plane_coord": 0.0, "near": [0.0, 40.0, 0.0] },
+        { "kind": "surface", "surf_kind": "plane", "normal": [0.0, 0.0, 1.0], "plane_coord": 14.0, "near": [0.0, 40.0, 14.0] }
+      ],
+      "pos_mm": [200.0, 201.0]
+    },
+    {
+      "id": "D_bore",
+      "view": "main_sec",
+      "orient": "horiz",
+      "refs": [
+        { "kind": "surface", "surf_kind": "cylinder", "radius": 14.0, "z_range": [0.0, 48.0], "near": [0.0, 14.0, 24.0], "pick_pt": [0.0, 14.0, 24.0] },
+        { "kind": "surface", "surf_kind": "cylinder", "radius": 14.0, "z_range": [0.0, 48.0], "near": [0.0, -14.0, 24.0], "pick_pt": [0.0, -14.0, 24.0] }
+      ],
+      "prefix": "Ø",
+      "suffix": "H8",
+      "tol_upper": 0.033,
+      "tol_lower": 0.0,
+      "tol_decimals": 3,
+      "pos_mm": [145.0, 256.0]
+    },
+    {
+      "id": "D_hub_od",
+      "view": "main_sec",
+      "orient": "horiz",
+      "refs": [
+        { "kind": "surface", "surf_kind": "cylinder", "radius": 24.0, "z_range": [20.0, 48.0], "near": [0.0, 24.0, 42.0], "pick_pt": [0.0, 24.0, 42.0] },
+        { "kind": "surface", "surf_kind": "cylinder", "radius": 24.0, "z_range": [20.0, 48.0], "near": [0.0, -24.0, 42.0], "pick_pt": [0.0, -24.0, 42.0] }
+      ],
+      "prefix": "Ø",
+      "tol_upper": 0.0,
+      "tol_lower": -0.025,
+      "tol_decimals": 3,
+      "pos_mm": [145.0, 270.0]
+    },
+    {
+      "id": "D_flange_od",
+      "view": "main_sec",
+      "orient": "horiz",
+      "refs": [
+        { "kind": "surface", "surf_kind": "cylinder", "radius": 45.0, "z_range": [0.0, 14.0], "near": [0.0, 45.0, 7.0], "pick_pt": [0.0, 45.0, 7.0] },
+        { "kind": "surface", "surf_kind": "cylinder", "radius": 45.0, "z_range": [0.0, 14.0], "near": [0.0, -45.0, 7.0], "pick_pt": [0.0, -45.0, 7.0] }
+      ],
+      "prefix": "Ø",
+      "pos_mm": [145.0, 182.0]
+    },
+    {
+      "id": "W_seal_groove",
+      "view": "detail_seal",
+      "orient": "vert",
+      "refs": [
+        { "kind": "surface", "surf_kind": "plane", "normal": [0.0, 0.0, 1.0], "plane_coord": 31.5, "near": [0.0, 23.0, 31.5] },
+        { "kind": "surface", "surf_kind": "plane", "normal": [0.0, 0.0, 1.0], "plane_coord": 36.5, "near": [0.0, 23.0, 36.5] }
+      ],
+      "anchor": "right",
+      "rel_view_mm": [12.0, 0.0]
+    },
+    {
+      "id": "D_bolt_circle",
+      "view": "top_view",
+      "orient": "horiz",
+      "refs": [
+        { "kind": "edge", "edge_type": "arc", "arc_radius": 4.5, "x_range": [-5.5, 5.5], "y_range": [29.5, 40.5], "z_range": [13.5, 14.5], "prefer_near": [4.5, 35.0, 14.0], "sense": "center" },
+        { "kind": "edge", "edge_type": "arc", "arc_radius": 4.5, "x_range": [-5.5, 5.5], "y_range": [-40.5, -29.5], "z_range": [13.5, 14.5], "prefer_near": [4.5, -35.0, 14.0], "sense": "center" }
+      ],
+      "prefix": "Ø",
+      "pos_mm": [145.0, 62.0]
+    },
+    {
+      "id": "D_bolt_hole",
+      "view": "top_view",
+      "orient": "horiz",
+      "refs": [
+        { "kind": "edge", "edge_type": "arc", "arc_radius": 4.5, "x_range": [-40.5, -29.5], "y_range": [-5.5, 5.5], "z_range": [13.5, 14.5], "prefer_near": [-35.0, -4.5, 14.0], "sense": "mid" },
+        { "kind": "edge", "edge_type": "arc", "arc_radius": 4.5, "x_range": [-40.5, -29.5], "y_range": [-5.5, 5.5], "z_range": [13.5, 14.5], "prefer_near": [-35.0, 4.5, 14.0], "sense": "mid" }
+      ],
+      "prefix": "4×Ø",
+      "pos_mm": [182.0, 162.0]
+    }
+  ],
+  "roughness_rest": "12.5",
+  "roughness_rest_x": 382.0,
+  "roughness_rest_y": 274.0,
+  "roughness_marks": [
+    { "view": "main_sec", "pos_mm": [126.0, 242.0], "ra": "1.6", "orient": "up", "machined": true },
+    { "view": "main_sec", "pos_mm": [108.0, 208.0], "ra": "3.2", "orient": "up", "machined": true }
+  ],
+  "notes": [
+    {
+      "pos_mm": [264.0, 95.0],
+      "height_mm": 3.2,
+      "hjust": "left",
+      "vjust": "top",
+      "lines": [
+        "技术要求：",
+        "1. 材料为45钢，调质处理，硬度220~250 HBW。",
+        "2. 其余未注尺寸公差按GB/T 1804-m级执行。",
+        "3. 锐边倒钝去毛刺，密封槽底不得有划伤。"
+      ]
+    }
+  ]
+}

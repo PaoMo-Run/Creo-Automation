@@ -23,6 +23,7 @@
  */
 
 #include "creo_plan_core.hpp"
+#include "creo_drawing_engine.hpp"
 #include <ProKinDrag.h>
 #include <ProMotorFeat.h>
 #include <ProSelbuffer.h>
@@ -1858,10 +1859,11 @@ Json load_plan_file() {
     return plan;
 }
 
-void read_mode(bool &is_verify, bool &is_anim, bool &use_default_names) {
+void read_mode(bool &is_verify, bool &is_anim, bool &use_default_names, bool &is_drawing) {
     is_verify = false;
     is_anim = false;
     use_default_names = false;
+    is_drawing = false;
     std::ifstream in("creobuild_mode.txt");
     if (!in) return;
     std::string line;
@@ -1869,6 +1871,7 @@ void read_mode(bool &is_verify, bool &is_anim, bool &use_default_names) {
         if (line.find("verify") != std::string::npos) is_verify = true;
         if (line.find("anim") != std::string::npos) is_anim = true;
         if (line.find("default") != std::string::npos) use_default_names = true;
+        if (line.find("drawing") != std::string::npos) is_drawing = true;
     }
 }
 
@@ -1998,6 +2001,7 @@ void finish_build_and_close(ProError st) {
             if (mst != PRO_TK_NO_ERROR) st = mst;
         }
         if (st == PRO_TK_NO_ERROR) {
+            apply_plan_default_view(log, g_build.ctx.mdl, g_build.win_id, g_build.plan);
             st = ProMdlSave(g_build.ctx.mdl);
             if (st != PRO_TK_NO_ERROR) log_st(log, "save", st);
         }
@@ -2158,6 +2162,7 @@ void run_mech_log_pose_impl(FILE *log) {
         if (g_build.plan.value("hide_datums_in_views", false)) {
             guard.hide();
         }
+        apply_plan_default_view(log, g_build.ctx.mdl, g_build.win_id, g_build.plan);
         std::wstring j_mech = g_build.w_part + L"_mech_end.jpg";
         ProError rst = export_view_jpg(g_build.ctx.mdl, g_build.win_id, L"DEFAULT", j_mech.c_str());
         log_printf(log, "MECH_END_JPG st=%d\n", static_cast<int>(rst));
@@ -2887,6 +2892,14 @@ ProError run_verify(FILE *log) {
         ProSelbufferClear();
         DatumDisplayGuard guard;
         if (plan.value("hide_datums_in_views", false)) guard.hide();
+        ProMatrix raw_vm{};
+        if (ProViewMatrixGet(part_mdl, nullptr, raw_vm) == PRO_TK_NO_ERROR) {
+            log_printf(log, "VERIFY_RAW_OPEN_VIEW col2=(%.3f,%.3f,%.3f) col0=(%.3f,%.3f,%.3f)\n",
+                       raw_vm[0][2], raw_vm[1][2], raw_vm[2][2], raw_vm[0][0], raw_vm[1][0], raw_vm[2][0]);
+        }
+        ProWindowRepaint(win_id);
+        ProRasterFileWrite(win_id, PRORASTERDEPTH_24, 10.0, 7.5, PRORASTERDPI_200, PRORASTERTYPE_JPEG,
+                           const_cast<wchar_t *>(L"verify_open_raw.jpg"));
         export_view_jpg(part_mdl, win_id, L"DEFAULT", L"verify_default.jpg");
     }
 
@@ -3151,6 +3164,37 @@ int creo_build_resume_cb(uiCmdCmdId cmd_id, uiCmdValue *p_val, void *appdata) {
     return 0;
 }
 
+int creo_dwg_step_cb(uiCmdCmdId cmd_id, uiCmdValue *p_val, void *appdata) {
+    (void)cmd_id;
+    (void)p_val;
+    (void)appdata;
+    if (!creobuild::dwg::g_dwg_job.active) return 0;
+    FILE *log = creobuild::dwg::g_dwg_job.log;
+    ProError st = PRO_TK_GENERAL_ERROR;
+    try {
+        st = creobuild::dwg::run_drawing_build_stage2();
+    } catch (ProError err) {
+        st = err;
+    } catch (const std::exception &ex) {
+        if (log) log_printf(log, "DWG_STAGE2_EXCEPTION=%s\n", ex.what());
+        st = PRO_TK_GENERAL_ERROR;
+    } catch (...) {
+        if (log) log_printf(log, "DWG_STAGE2_EXCEPTION=unknown\n");
+        st = PRO_TK_GENERAL_ERROR;
+    }
+    creobuild::dwg::g_dwg_job.active = false;
+    if (log) {
+        if (st == PRO_TK_NO_ERROR) {
+            log_printf(log, "STATUS=OK\n");
+        } else {
+            log_printf(log, "STATUS=ERROR\nERROR_CODE=%d\n", static_cast<int>(st));
+        }
+        fclose(log);
+        creobuild::dwg::g_dwg_job.log = nullptr;
+    }
+    return 0;
+}
+
 int creo_build_exec_cb(uiCmdCmdId cmd_id, uiCmdValue *p_val, void *appdata) {
     (void)cmd_id;
     (void)p_val;
@@ -3159,12 +3203,38 @@ int creo_build_exec_cb(uiCmdCmdId cmd_id, uiCmdValue *p_val, void *appdata) {
     if (g_has_run) return 0;
     g_has_run = 1;
 
-    bool is_verify = false, is_anim = false, use_default_names = false;
-    read_mode(is_verify, is_anim, use_default_names);
+    bool is_verify = false, is_anim = false, use_default_names = false, is_drawing = false;
+    read_mode(is_verify, is_anim, use_default_names, is_drawing);
     (void)is_anim;
     const char *report_name = is_verify ? "verify_result.txt" : "build_report.txt";
     FILE *log = fopen(report_name, "w");
     if (!log) return -1;
+
+    if (is_drawing) {
+        ProError st = PRO_TK_GENERAL_ERROR;
+        try {
+            st = is_verify ? creobuild::dwg::run_drawing_verify(log)
+                           : creobuild::dwg::run_drawing_build(log);
+        } catch (ProError err) {
+            st = err;
+        } catch (const std::exception &ex) {
+            log_printf(log, "DWG_EXCEPTION=%s\n", ex.what());
+            st = PRO_TK_GENERAL_ERROR;
+        } catch (...) {
+            log_printf(log, "DWG_EXCEPTION=unknown\n");
+            st = PRO_TK_GENERAL_ERROR;
+        }
+        if (!is_verify && st == PRO_TK_NO_ERROR && creobuild::dwg::g_dwg_job.active) {
+            return 0;
+        }
+        if (st == PRO_TK_NO_ERROR) {
+            log_printf(log, "STATUS=OK\n");
+        } else {
+            log_printf(log, "STATUS=ERROR\nERROR_CODE=%d\n", static_cast<int>(st));
+        }
+        fclose(log);
+        return 0;
+    }
 
     if (is_verify) {
         ProError st = PRO_TK_GENERAL_ERROR;
@@ -3218,8 +3288,16 @@ extern "C" int user_initialize(
     (void)build;
     (void)errbuf;
 
-    uiCmdCmdId cmd_id = 0, pick_id = 0, mpick_id = 0, msket_id = 0, res_id = 0, step_id = 0, mechp_id = 0, mechl_id = 0, fin_id = 0;
+    uiCmdCmdId cmd_id = 0, pick_id = 0, mpick_id = 0, msket_id = 0, res_id = 0, step_id = 0, mechp_id = 0, mechl_id = 0, fin_id = 0, dwgs_id = 0;
     ProMacro wmacro;
+    ProCmdActionAdd(
+        const_cast<char *>("CreoDwgStep"),
+        reinterpret_cast<uiCmdCmdActFn>(creo_dwg_step_cb),
+        uiProe2ndImmediate,
+        access_always,
+        PRO_B_TRUE,
+        PRO_B_TRUE,
+        &dwgs_id);
     ProCmdActionAdd(
         const_cast<char *>("CreoBlendPickSec"),
         reinterpret_cast<uiCmdCmdActFn>(creo_blend_pick_sec_cb),

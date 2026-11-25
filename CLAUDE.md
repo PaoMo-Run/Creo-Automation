@@ -3,8 +3,8 @@
 This project (`Creo-Automation`) provides a C++17 Pro/TOOLKIT JSON-plan-driven automation engine for PTC Creo Parametric on Windows x64, paired with pure-stdlib Python auto-discovery and setup scripts.
 
 - Read [AGENTS.md](AGENTS.md) for the autonomous environment check, portable MSVC installation, smoke-test protocol, sandbox warning, and engineering invariants.
-- Read [.agents/skills/creo-parametric-automation/SKILL.md](.agents/skills/creo-parametric-automation/SKILL.md), [.agents/skills/creo-parametric-automation/references/feature_mirror_workflow.md](.agents/skills/creo-parametric-automation/references/feature_mirror_workflow.md), and [.agents/skills/creo-parametric-automation/references/mechanism_ui_video_recording.md](.agents/skills/creo-parametric-automation/references/mechanism_ui_video_recording.md) for the full Creo modeling, Pro/TOOLKIT, and desktop UI recording workflows.
-- Read [docs/PLAN_SCHEMA.md](docs/PLAN_SCHEMA.md) when authoring new `plans/*.json` models.
+- Read [.agents/skills/creo-parametric-automation/SKILL.md](.agents/skills/creo-parametric-automation/SKILL.md) (and sub-skills [.agents/skills/creo-engineering-drawing/SKILL.md](.agents/skills/creo-engineering-drawing/SKILL.md), [.agents/skills/creo-ui-demo-recording/SKILL.md](.agents/skills/creo-ui-demo-recording/SKILL.md)) for the full 3D/2D/UI Creo automation workflows.
+- Read [docs/PLAN_SCHEMA.md](docs/PLAN_SCHEMA.md) when authoring new `plans/*.json` models or drawings.
 
 Quick start for agents:
 1. Run `python setup.py --check --json`

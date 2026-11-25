@@ -31,6 +31,7 @@ The C++17 Pro/TOOLKIT engine (`src_c/creo_auto_modeler.cpp` & `src_c/creo_plan_c
 | `motors` | `object[]` | `[]` | Assembly-level Mechanism servo motors (`PRO_FEAT_PM_MOTOR`). |
 | `mechanism_analysis` | `boolean` | `false` | Run and persist `AnalysisDefinition1` in Creo Mechanism mode after motors are created. |
 | `export_mech_end_view` | `boolean` | `false` | Export `<part_name>_mech_end.jpg` at the final Mechanism playback pose (`t = end`). |
+| `default_view_camera` | `object` | `null` | Custom default opening orientation (`{"look_from": [x,y,z], "up": [0,1,0], "store_as_default": true}`), verified via `VERIFY_RAW_OPEN_VIEW` / `verify_open_raw.jpg`. |
 | `operations` | `object[]` | *(required)* | Ordered list of modeling operations. |
 
 ---
@@ -166,3 +167,18 @@ The C++17 Pro/TOOLKIT engine (`src_c/creo_auto_modeler.cpp` & `src_c/creo_plan_c
   - `b_spline`: `control_points`, `degree`, optional `knots`, optional `weights`
 - **Constraints (`constraints`)**: `same_point` (`coincident`), `tangent`, `orthogonal` (`perpendicular`), `parallel`, `horizontal`, `vertical`, `equal_radii`, `equal_segments` (`equal_length`), `collinear`, `point_on`.
 - **Dimensions (`dimensions`)**: `line` (`length`), `radius`, `diameter`, `pnt_pnt` (`distance`), `horiz`, `vert`, `line_line`, `angle`, placed at `place_3d` / `place_rz` / `place_2d` with optional driving `value`.
+
+---
+
+## 5. GB/T 2D Engineering Drawing Plans (`doc_type: "drawing"`)
+
+Driven by `src_c/creo_drawing_engine.hpp` (`drawing` & `verify_drawing` modes in `build_cpp.py`, see `plans/dwg_flanged_hub.json`):
+
+- **Top-level fields**: `doc_type: "drawing"`, `model_name`, `drawing_name`, optional `model_plan` / `model_path`, `template` (`"a3_drawing"`), `font` (`"chfntf"`), `sheet_scale` (`1.0`), `density_g_cm3` (`7.85`), `title_block` (`part_title`, `drawing_no`, `material`, `scale`, `quantity`).
+- **Geometry & Views**:
+  - `datum_points`: Helper points created in `DWG_REF_PNTS` (auto-hidden before save).
+  - `xsections`: Planar sections (`[{"name": "A", "plane": "FRONT"|"RIGHT"|"TOP"}]`).
+  - `views`: Four-pass layout (`general` with `matrix3` / `scale: 0.0`, `projected` with `parent` / `proj_dir`, optional `section` & `broken`, and `detail` with `ref` / `circle_radius_mm` / `scale` / `label`), finalized with `move_center_mm`.
+- **Annotations & Exports**:
+  - `centerlines` (`view_mid_h`, `view_mid_v`, `3d_line`, `model_axis`, `mm_line`), associative `dimensions` (`surface`/`edge` rules + `tol_upper`/`tol_lower`/`tol_sym`), `roughness_rest` / `roughness_marks`, and `notes`.
+  - Automatically exports `{drawing_name}.drw.1`, monochrome 300-DPI `{drawing_name}.pdf`, AutoCAD `{drawing_name}.dwg` (`AC1032`), updated `{model_name}.prt.1`, and verifies `DRW_REOPEN_VERIFIED=true` in an isolated sandbox.

@@ -169,6 +169,7 @@ def write_creo_runtime_files(
     plan_path: Path,
     mode: str,
     templates_dir: Path,
+    config_extra: str = "",
 ) -> None:
     """Create isolated creotk.dat, config.pro, text/, and plan files inside workdir."""
     shutil.copy2(dll_path, workdir / dll_path.name)
@@ -188,16 +189,17 @@ end
 """,
         encoding="utf-8",
     )
-    (workdir / "config.pro").write_text(
+    cfg_text = (
         "web_browser_homepage about:blank\n"
         "prompt_on_exit no\n"
         "save_objects all\n"
         "save_texture_with_model yes\n"
         "open_protk_unsigned_apps always\n"
         "search_path .\n"
-        f"search_path {templates_dir}\n",
-        encoding="utf-8",
+        f"search_path {templates_dir}\n"
+        + config_extra
     )
+    (workdir / "config.pro").write_text(cfg_text, encoding="utf-8")
 
 
 def find_trail_issues(trail_text: str) -> list[str]:
@@ -221,6 +223,8 @@ def run_creo_phase(
     open_cli_prt: Path | None = None,
     cli_open_name: str | None = None,
     extra_files: list[Path] | None = None,
+    stage_renames: list[tuple[Path, str]] | None = None,
+    config_extra: str = "",
     timeout_s: float = 240.0,
 ) -> str:
     """Launch Creo in an isolated sandbox directory for build or reopen verification."""
@@ -232,10 +236,20 @@ def run_creo_phase(
     if extra_files:
         for ef in extra_files:
             shutil.copy2(ef, workdir / ef.name)
+    if stage_renames:
+        for src_p, dst_name in stage_renames:
+            shutil.copy2(src_p, workdir / dst_name)
     if open_cli_prt is not None:
         shutil.copy2(open_cli_prt, workdir / f"{open_cli_prt.name}.1")
 
-    write_creo_runtime_files(workdir, dll_path, plan_path, mode, Path(creo.templates_dir))
+    write_creo_runtime_files(
+        workdir,
+        dll_path,
+        plan_path,
+        mode,
+        Path(creo.templates_dir),
+        config_extra=config_extra,
+    )
 
     kill_creo()
     cmd = [creo.creo_exe, creo.creo_psf]
@@ -448,18 +462,240 @@ def build_and_verify_single_plan(
                     print(f"[verify:{part_name}] .inf SHA256 match (normalized mirror rows): {nh1}")
                 else:
                     print(f"[verify:{part_name}] .inf SHA256 match: {h1}")
+        raw_open_jpg = VERIFY_DIR / "verify_open_raw.jpg"
+        if raw_open_jpg.is_file():
+            shutil.copy2(raw_open_jpg, dest_dir / f"{part_name}_verify_open_raw.jpg")
         print(f"[verify:{part_name}] Reopen & force-regen passed:")
         print(verify_report.rstrip())
 
     return out_mdl
 
 
+def is_drawing_plan(plan_data: dict) -> bool:
+    """Return True if plan JSON describes a 2D GB/T engineering drawing job."""
+    return str(plan_data.get("doc_type", "")) == "drawing" or (
+        "drawing_name" in plan_data and "model_name" in plan_data
+    )
+
+
+def make_gb_dtl(dest_dir: Path, iso_dtl_src: Path, font_name: str = "chfntf") -> Path:
+    """Create a GB/T 4458.1 first-angle metric .dtl setup file from Creo's iso_mm.dtl."""
+    base = iso_dtl_src.read_text(encoding="utf-8", errors="replace") if iso_dtl_src.is_file() else ""
+    overrides = {
+        "projection_type": "FIRST_ANGLE",
+        "drawing_units": "MM",
+        "decimal_marker": "PERIOD",
+        "default_font": font_name,
+        "default_annotation_font": font_name,
+        "symbol_font": "LEGACY",
+        "drawing_text_height": "3.500000",
+        "def_view_text_height": "4.000000",
+        "text_orientation": "PARALLEL_DIAM_HORIZ",
+        "parallel_dim_placement": "ABOVE",
+        "draw_arrow_style": "FILLED",
+        "draw_arrow_length": "3.500000",
+        "draw_arrow_width": "1.200000",
+        "dim_text_gap": "1.000000",
+        "dim_leader_length": "5.000000",
+        "tol_display": "YES",
+        "tol_text_height_factor": "0.650000",
+        "tol_text_width_factor": "0.750000",
+        "symmetric_tol_display_standard": "STD_ISO",
+        "lead_trail_zeros": "STD_METRIC",
+        "broken_view_offset": "5.000000",
+        "view_scale_denominator": "10",
+        "view_scale_format": "RATIO_COLON",
+        "detail_view_boundary_type": "CIRCLE",
+        "detail_view_circle": "ON",
+        "detail_circle_line_style": "SOLIDFONT",
+        "crossec_arrow_style": "HEAD_ONLINE",
+        "crossec_arrow_length": "6.000000",
+        "crossec_arrow_width": "2.000000",
+        "default_show_2d_section_xhatch": "ASSEMBLY_AND_PART",
+        "def_xhatch_break_around_text": "YES",
+        "view_note": "STD_ISO",
+    }
+    lines: list[str] = []
+    seen: set[str] = set()
+    for raw in base.splitlines():
+        parts = raw.strip().split()
+        if parts and parts[0] in overrides:
+            k = parts[0]
+            lines.append(f"{k} {overrides[k]}")
+            seen.add(k)
+        else:
+            lines.append(raw)
+    for k, v in overrides.items():
+        if k not in seen:
+            lines.append(f"{k} {v}")
+    out = dest_dir / "gb_mm.dtl"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out
+
+
 def resolve_plan_dest_dir(plan_data: dict) -> Path:
     sub = plan_data.get("output_subdir")
     if isinstance(sub, str) and sub.strip():
         return OUT_DIR / sub.strip()
+    if is_drawing_plan(plan_data):
+        return OUT_DIR / str(plan_data["drawing_name"])
     part_name = str(plan_data["part_name"])
     return OUT_DIR / part_name
+
+
+def build_and_verify_drawing_plan(
+    creo: CreoInstallInfo,
+    dll_path: Path,
+    plan_path: Path,
+    dest_dir: Path,
+    build_mode: str,
+    skip_reopen: bool,
+    reuse_components: bool = False,
+    render_pdf: bool = False,
+    timeout_s: float = 360.0,
+) -> Path:
+    """Build a 2D GB/T engineering drawing (.drw.1 + .pdf + .dwg) and run isolated reopen verification."""
+    plan_data = json.loads(plan_path.read_text(encoding="utf-8"))
+    drw_name = str(plan_data["drawing_name"])
+    model_name = str(plan_data["model_name"])
+    tmpl_name = str(plan_data.get("template", "a3_drawing"))
+    font_name = str(plan_data.get("font", "chfntf"))
+
+    creo_root = Path(creo.creo_root) if creo.creo_root else Path(creo.creo_exe).parents[2]
+    iso_tmpl_dir = creo_root / "Common Files" / "creo_standards" / "templates_iso_mm"
+    iso_dtl_src = creo_root / "Common Files" / "creo_standards" / "draw_standards" / "iso_mm.dtl"
+    tmpl_src = iso_tmpl_dir / f"{tmpl_name}.drw"
+    if not tmpl_src.is_file():
+        tmpl_src = Path(creo.templates_dir) / f"{tmpl_name}.drw"
+    if not tmpl_src.is_file():
+        raise FileNotFoundError(f"Drawing template '{tmpl_name}.drw' not found under {iso_tmpl_dir} or {creo.templates_dir}")
+
+    # Resolve or build source 3D model (.prt.1)
+    src_mdl_path: Path | None = None
+    if plan_data.get("model_path"):
+        cand = Path(str(plan_data["model_path"]))
+        if not cand.is_absolute():
+            cand = (ROOT / cand).resolve()
+        if cand.is_file():
+            src_mdl_path = cand
+    if src_mdl_path is None:
+        cached = resolve_plan_dest_dir({"part_name": model_name}) / f"{model_name}.prt.1"
+        if reuse_components and cached.is_file():
+            src_mdl_path = cached
+    if src_mdl_path is None and plan_data.get("model_plan"):
+        mplan = Path(str(plan_data["model_plan"]))
+        if not mplan.is_absolute():
+            cand = plan_path.parent / mplan
+            mplan = cand if cand.is_file() else (ROOT / mplan)
+        mplan = mplan.resolve()
+        if not mplan.is_file():
+            raise FileNotFoundError(f"Source model_plan not found: {mplan}")
+        mdata = json.loads(mplan.read_text(encoding="utf-8"))
+        m_dest = resolve_plan_dest_dir(mdata)
+        print(f"[drawing] Building source 3D model '{model_name}' from {mplan.name}...")
+        src_mdl_path = build_and_verify_single_plan(
+            creo,
+            dll_path,
+            mplan,
+            m_dest,
+            build_mode,
+            skip_reopen=skip_reopen,
+            clean_dest=True,
+            timeout_s=timeout_s,
+        )
+    if src_mdl_path is None:
+        fallback = OUT_DIR / model_name / f"{model_name}.prt.1"
+        if fallback.is_file():
+            src_mdl_path = fallback
+    if src_mdl_path is None or not src_mdl_path.is_file():
+        raise FileNotFoundError(f"Source model '{model_name}.prt.1' not found; specify 'model_plan' or 'model_path'.")
+
+    extras_dir = BUILD_DIR / f"_dwg_extras_{drw_name}"
+    if extras_dir.exists():
+        shutil.rmtree(extras_dir)
+    extras_dir.mkdir(parents=True)
+    gb_dtl = make_gb_dtl(extras_dir, iso_dtl_src, font_name=font_name)
+
+    cfg_extra = (
+        f"drawing_setup_file ./{gb_dtl.name}\n"
+        f"search_path {iso_tmpl_dir}\n"
+        "datum_display no\n"
+        "axis_display no\n"
+        "datum_point_display no\n"
+        "display_coord_sys no\n"
+        "pdf_use_pentable no\n"
+    )
+    build_report = run_creo_phase(
+        creo,
+        STAGE_DIR,
+        dll_path,
+        plan_path,
+        "drawing",
+        "build_report.txt",
+        cli_open_name=f"{drw_name}.drw.1",
+        stage_renames=[
+            (src_mdl_path, f"{model_name}.prt.1"),
+            (tmpl_src, f"{drw_name}.drw.1"),
+            (gb_dtl, gb_dtl.name),
+        ],
+        config_extra=cfg_extra,
+        timeout_s=timeout_s,
+    )
+    print(f"[drawing:{drw_name}] Creo C++ Pro/TOOLKIT drawing phase completed:")
+    print(build_report.rstrip())
+
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
+    dest_dir.mkdir(parents=True)
+
+    drw_latest = latest_mdl_iteration(STAGE_DIR, drw_name, ext="drw")
+    prt_latest = latest_mdl_iteration(STAGE_DIR, model_name, ext="prt")
+    out_drw = dest_dir / f"{drw_name}.drw.1"
+    out_prt = dest_dir / f"{model_name}.prt.1"
+    shutil.copy2(drw_latest, out_drw)
+    shutil.copy2(prt_latest, out_prt)
+    for fn in (f"{drw_name}.pdf", f"{drw_name}.dwg", "build_report.txt"):
+        src = STAGE_DIR / fn
+        if src.is_file():
+            shutil.copy2(src, dest_dir / fn)
+
+    pdf_out = dest_dir / f"{drw_name}.pdf"
+    if render_pdf and pdf_out.is_file():
+        try:
+            import fitz  # Optional PyMuPDF
+        except ImportError:
+            print("[render] Optional PyMuPDF (`fitz`) not installed; skipping PNG preview render.")
+        else:
+            doc = fitz.open(str(pdf_out))
+            page = doc[0]
+            pix = page.get_pixmap(matrix=fitz.Matrix(220 / 72.0, 220 / 72.0), alpha=False)
+            png_out = dest_dir / f"{drw_name}_preview.png"
+            pix.save(str(png_out))
+            doc.close()
+            print(f"[render] Saved 220-DPI preview PNG: {png_out}")
+
+    if not skip_reopen:
+        verify_report = run_creo_phase(
+            creo,
+            VERIFY_DIR,
+            dll_path,
+            plan_path,
+            "verify_drawing",
+            "verify_result.txt",
+            cli_open_name=f"{drw_name}.drw.1",
+            stage_renames=[
+                (out_prt, f"{model_name}.prt.1"),
+                (out_drw, f"{drw_name}.drw.1"),
+            ],
+            timeout_s=timeout_s,
+        )
+        shutil.copy2(VERIFY_DIR / "verify_result.txt", dest_dir / "verify_result.txt")
+        if "DRW_REOPEN_VERIFIED=true" not in verify_report:
+            raise RuntimeError(f"Drawing reopen verification failed for '{drw_name}':\n{verify_report}")
+        print(f"[verify_drawing:{drw_name}] Reopen & sheet-regen passed:")
+        print(verify_report.rstrip())
+
+    return out_drw
 
 
 def export_clean_deliverable(plan_path: Path, src_dir: Path, deliverable_dir: Path) -> None:
@@ -509,6 +745,7 @@ def main() -> int:
         default=None,
         help="Optional flat deliverable directory containing only .asm.1, .prt.1, and .jpg screenshots",
     )
+    parser.add_argument("--render-pdf", action="store_true", help="Render 220-DPI PNG preview for drawing plans if PyMuPDF is installed")
     parser.add_argument("--timeout", type=float, default=360.0, help="Timeout per Creo phase in seconds")
     args = parser.parse_args()
 
@@ -547,14 +784,29 @@ def main() -> int:
     )
 
     plan_data = json.loads(plan_path.read_text(encoding="utf-8"))
-    part_name = str(plan_data["part_name"])
-    doc_type = str(plan_data.get("doc_type", "part"))
-
     dll_path = compile_and_unlock(creo, msvc)
     print(f"[1/3] Compiled and unlocked: {dll_path}")
 
     build_mode = "build:default" if args.default_names else "build:zh"
     dest_dir = resolve_plan_dest_dir(plan_data)
+
+    if is_drawing_plan(plan_data):
+        build_and_verify_drawing_plan(
+            creo,
+            dll_path,
+            plan_path,
+            dest_dir,
+            build_mode,
+            args.skip_reopen,
+            reuse_components=args.reuse_components,
+            render_pdf=args.render_pdf,
+            timeout_s=args.timeout,
+        )
+        print(f"[3/3] Clean drawing deliverables written to: {dest_dir}")
+        return 0
+
+    part_name = str(plan_data["part_name"])
+    doc_type = str(plan_data.get("doc_type", "part"))
     comps_dir_name = plan_data.get("components_dir_name", "components")
     comps_base = (dest_dir / str(comps_dir_name)) if comps_dir_name else dest_dir
 

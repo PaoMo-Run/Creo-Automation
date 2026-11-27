@@ -174,7 +174,9 @@ The C++17 Pro/TOOLKIT engine (`src_c/creo_auto_modeler.cpp` & `src_c/creo_plan_c
 
 Driven by `src_c/creo_drawing_engine.hpp` (`drawing` & `verify_drawing` modes in `build_cpp.py`, see `plans/dwg_flanged_hub.json`):
 
-- **Top-level fields**: `doc_type: "drawing"`, `model_name`, `drawing_name`, optional `model_plan` / `model_path`, `template` (`"a3_drawing"`), `font` (`"chfntf"`), `sheet_scale` (`1.0`), `density_g_cm3` (`7.85`), `title_block` (`part_title`, `drawing_no`, `material`, `scale`, `quantity`).
+- **Top-level fields**: `doc_type: "drawing"`, `model_name`, `drawing_name`, optional `model_plan` / `model_path`, `template` (`"a3_drawing"`), `font` (`"chfntf"`), `sheet_scale` (`1.0`), `density_g_cm3` (`7.85`).
+- **Sheet and title block**: A3 landscape binding frame (420 × 297 mm, 25 mm at left and 5 mm on the other three sides) per GB/T 14689-2008. The 180 × 56 mm title block uses the GB/T 10609.1-2008 Appendix A arrangement and a first-angle projection symbol.
+  - Optional `title_block` strings: `part_title`, `drawing_no`, `material`, `scale`, `quantity`, `designer`, `date` (for example, `2026-11-27`), and `organization`. If `scale` is omitted it is derived from `sheet_scale`. Signature and organization fields are blank when omitted. Computed mass is shown in kg using `density_g_cm3`.
 - **Geometry & Views**:
   - `datum_points`: Helper points created in `DWG_REF_PNTS` (auto-hidden before save).
   - `xsections`: Planar sections (`[{"name": "A", "plane": "FRONT"|"RIGHT"|"TOP"}]`).

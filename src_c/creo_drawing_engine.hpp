@@ -3,7 +3,7 @@
  * Creo Parametric 8.0 GB/T Engineering Drawing Engine (C++17 Pro/TOOLKIT).
  *
  * Generates native associative Creo drawings (.drw) with:
- *   - GB/T 14689 A3 (420x297 mm) frame, binding margin (a=25, c=10), center marks
+ *   - GB/T 14689-2008 A3 (420x297 mm) binding frame (a=25, c=5), center marks
  *   - Simplified academic/course-design GB/T Chinese title block (ProDwgtable + 1st-angle symbol)
  *   - First-angle orthographic views, planar full cross-sections, vertical broken views,
  *     and circular enlarged detail views (2:1)
@@ -377,24 +377,24 @@ inline ProError add_note_mm(
 
 /* Draw standard GB/T 4458.1 first-angle projection symbol centered at (cx, cy) */
 inline void draw_gb_first_angle_symbol(ProDrawing drw, const SheetCoord &sc, double cx, double cy) {
-    // Left: truncated cone (large end on left, small end on right)
+    // Left: truncated cone (small end on left, large end on right)
     double cone_x0 = cx - 7.5;
     double cone_x1 = cx - 1.5;
     double r_big = 2.6;
     double r_sml = 1.4;
-    draw_line_mm(drw, sc, nullptr, cone_x0, cy - r_big, cone_x0, cy + r_big, 0.25);
-    draw_line_mm(drw, sc, nullptr, cone_x1, cy - r_sml, cone_x1, cy + r_sml, 0.25);
-    draw_line_mm(drw, sc, nullptr, cone_x0, cy + r_big, cone_x1, cy + r_sml, 0.25);
-    draw_line_mm(drw, sc, nullptr, cone_x0, cy - r_big, cone_x1, cy - r_sml, 0.25);
+    draw_line_mm(drw, sc, nullptr, cone_x0, cy - r_sml, cone_x0, cy + r_sml, 0.5);
+    draw_line_mm(drw, sc, nullptr, cone_x1, cy - r_big, cone_x1, cy + r_big, 0.5);
+    draw_line_mm(drw, sc, nullptr, cone_x0, cy + r_sml, cone_x1, cy + r_big, 0.5);
+    draw_line_mm(drw, sc, nullptr, cone_x0, cy - r_sml, cone_x1, cy - r_big, 0.5);
 
     // Right: concentric circles
     double circ_x = cx + 4.2;
-    draw_arc_mm(drw, sc, nullptr, circ_x, cy, r_big, 0.0, 2.0 * M_PI, 0.25);
-    draw_arc_mm(drw, sc, nullptr, circ_x, cy, r_sml, 0.0, 2.0 * M_PI, 0.25);
+    draw_arc_mm(drw, sc, nullptr, circ_x, cy, r_big, 0.0, 2.0 * M_PI, 0.5);
+    draw_arc_mm(drw, sc, nullptr, circ_x, cy, r_sml, 0.0, 2.0 * M_PI, 0.5);
 
     // Centerlines
     draw_line_mm(drw, sc, nullptr, cone_x0 - 1.5, cy, circ_x + r_big + 1.5, cy, 0.18, L"CTRLFONT");
-    draw_line_mm(drw, sc, nullptr, circ_x, cy - r_big - 1.2, circ_x, cy + r_big + 1.2, 0.18, L"CTRLFONT");
+    draw_line_mm(drw, sc, nullptr, circ_x, cy - r_big - 0.9, circ_x, cy + r_big + 0.9, 0.18, L"CTRLFONT");
 }
 
 /* Draw GB/T 131-2006 surface roughness symbol at (x_mm, y_mm) pointing down onto surface */
@@ -535,108 +535,104 @@ inline void style_table_cell(
     }
 }
 
-/* Draw GB/T 14689 A3 border + center marks + simplified academic Chinese title block (140x32 mm) */
+// A3 binding frame (GB/T 14689-2008) and 180 x 56 title block (GB/T 10609.1-2008).
 inline void draw_gb_a3_frame_and_titleblock(
-    ProDrawing drw,
-    const SheetCoord &sc,
-    const Json &plan,
-    double mass_kg,
-    const std::wstring &font_name,
-    FILE *log
+    ProDrawing drw, const SheetCoord &sc, const Json &plan, double mass_kg,
+    const std::wstring &font_name, FILE *log
 ) {
-    // 1. Outer paper cut frame (420x297 mm, thin 0.25 mm)
-    draw_line_mm(drw, sc, nullptr, 0.0, 0.0, 420.0, 0.0, 0.25);
-    draw_line_mm(drw, sc, nullptr, 420.0, 0.0, 420.0, 297.0, 0.25);
-    draw_line_mm(drw, sc, nullptr, 420.0, 297.0, 0.0, 297.0, 0.25);
-    draw_line_mm(drw, sc, nullptr, 0.0, 297.0, 0.0, 0.0, 0.25);
+    auto line = [&](double x1, double y1, double x2, double y2) {
+        draw_line_mm(drw, sc, nullptr, x1, y1, x2, y2, 0.7);
+    };
+    constexpr double left = 235, bottom = 5, top = 61, right = 415;
+    line(25, bottom, right, bottom);
+    line(right, bottom, right, 292);
+    line(right, 292, 25, 292);
+    line(25, 292, 25, bottom);
+    line(210, 297, 210, 287);
+    line(210, 0, 210, 10);
+    line(0, 148.5, 30, 148.5);
+    line(420, 148.5, 410, 148.5);
 
-    // 2. GB/T 14689 Inner border with binding margin (a=25 mm left, c=10 mm top/right/bottom, thick 0.70 mm)
-    draw_line_mm(drw, sc, nullptr, 25.0, 10.0, 410.0, 10.0, 0.70);
-    draw_line_mm(drw, sc, nullptr, 410.0, 10.0, 410.0, 287.0, 0.70);
-    draw_line_mm(drw, sc, nullptr, 410.0, 287.0, 25.0, 287.0, 0.70);
-    draw_line_mm(drw, sc, nullptr, 25.0, 287.0, 25.0, 10.0, 0.70);
-
-    // 3. GB/T 14689 Center marks (对中符号, 0.70 mm extending 5 mm inside border)
-    draw_line_mm(drw, sc, nullptr, 210.0, 297.0, 210.0, 282.0, 0.70);
-    draw_line_mm(drw, sc, nullptr, 210.0, 0.0, 210.0, 15.0, 0.70);
-    draw_line_mm(drw, sc, nullptr, 25.0, 148.5, 30.0, 148.5, 0.70);
-    draw_line_mm(drw, sc, nullptr, 420.0, 148.5, 405.0, 148.5, 0.70);
-
-    // 4. Simplified academic GB/T Chinese title block (140 x 32 mm at bottom-right X=270..410, Y=10..42)
-    // PRODWGTABLESIZE_SCREEN expects drawing sheet units (mm directly) on metric sheets
-    const double tb_x0 = 270.0;
-    const double tb_y1 = 42.0;
-    double col_w_mm[6] = {14.0, 22.0, 14.0, 18.0, 20.0, 52.0};
-    double row_h_mm[4] = {8.0, 8.0, 8.0, 8.0};
-    ProHorzJust col_j[6] = {
-        PROHORZJUST_CENTER, PROHORZJUST_CENTER, PROHORZJUST_CENTER,
-        PROHORZJUST_CENTER, PROHORZJUST_CENTER, PROHORZJUST_CENTER
+    // Table dimensions use sheet millimeters. Only the origin uses screen coordinates.
+    auto create = [&](const char *section, double x, double y,
+                      std::vector<double> widths, std::vector<double> heights) {
+        std::vector<ProHorzJust> align(widths.size(), PROHORZJUST_CENTER);
+        ProDwgtabledata data = nullptr;
+        ProDwgtable table{};
+        ProDwgtabledataAlloc(&data);
+        ProPoint3d origin{};
+        sc.mm_to_scn(x, y, origin);
+        ProDwgtabledataOriginSet(data, origin);
+        ProDwgtabledataSizetypeSet(data, PRODWGTABLESIZE_SCREEN);
+        ProDwgtabledataColumnsSet(data, static_cast<int>(widths.size()), widths.data(), align.data());
+        ProDwgtabledataRowsSet(data, static_cast<int>(heights.size()), heights.data());
+        const ProError status = ProDrawingTableCreate(drw, data, PRO_B_TRUE, &table);
+        log_printf(log, "TITLEBLOCK_TABLE[%s] st=%d\n", section, static_cast<int>(status));
+        if (status != PRO_TK_NO_ERROR) throw std::runtime_error("Title block table creation failed");
+        return table;
+    };
+    const Json tb = plan.value("title_block", Json::object());
+    const double sheet_scale = plan.value("sheet_scale", 1.0);
+    char default_scale[32]{};
+    if (sheet_scale >= 1.0) {
+        std::snprintf(default_scale, sizeof(default_scale), "%.6g:1", sheet_scale);
+    } else if (sheet_scale > 0.0) {
+        std::snprintf(default_scale, sizeof(default_scale), "1:%.6g", 1.0 / sheet_scale);
+    }
+    char mass_text[32]{};
+    std::snprintf(mass_text, sizeof(mass_text), "%.2f", mass_kg);
+    auto write = [&](ProDwgtable &table, int col, int row, const std::string &value, double height = 3.5) {
+        style_table_cell(&table, col, row, value, height, sc, font_name);
+    };
+    auto merge = [](ProDwgtable &table, int c1, int r1, int c2, int r2) {
+        ProDwgtableCellsMerge(&table, c1, r1, c2, r2, PRO_B_FALSE);
     };
 
-    ProDwgtabledata tdata = nullptr;
-    ProDwgtabledataAlloc(&tdata);
-    ProPoint3d origin{};
-    sc.mm_to_scn(tb_x0, tb_y1, origin);
-    ProDwgtabledataOriginSet(tdata, origin);
-    ProDwgtabledataSizetypeSet(tdata, PRODWGTABLESIZE_SCREEN);
-    ProDwgtabledataColumnsSet(tdata, 6, col_w_mm, col_j);
-    ProDwgtabledataRowsSet(tdata, 4, row_h_mm);
+    auto revisions = create("revisions", left, top, {10, 10, 16, 16, 12, 16}, {7, 7, 7, 7});
+    write(revisions, 1, 4, "标记", 2.5);
+    write(revisions, 2, 4, "处数", 2.5);
+    write(revisions, 3, 4, "分区", 2.5);
+    write(revisions, 4, 4, "更改文件号", 2.5);
+    write(revisions, 5, 4, "签名", 2.5);
+    write(revisions, 6, 4, "年 月 日", 2.5);
 
-    ProDwgtable tbl{};
-    ProError tst = ProDrawingTableCreate(drw, tdata, PRO_B_TRUE, &tbl);
-    log_printf(log, "TITLEBLOCK_TABLE st=%d\n", static_cast<int>(tst));
+    auto signatures = create("signatures", left, 33, {12, 12, 21, 13, 9, 13}, {7, 7, 7, 7});
+    write(signatures, 1, 1, "设计", 3.0);
+    write(signatures, 2, 1, tb.value("designer", std::string()), 3.2);
+    write(signatures, 3, 1, tb.value("date", std::string()), 2.4);
+    write(signatures, 4, 1, "标准化", 2.8);
+    write(signatures, 1, 3, "审核", 3.0);
+    write(signatures, 1, 4, "工艺", 3.0);
+    write(signatures, 4, 4, "批准", 3.0);
 
-    const Json &tb = plan.value("title_block", Json::object());
-    std::string part_title = tb.value("part_title", std::string("零件图"));
-    std::string dwg_no = tb.value("drawing_no", std::string("DWG-001"));
-    std::string material = tb.value("material", std::string("45"));
-    std::string scale_str = tb.value("scale", std::string("1:1"));
-    std::string qty_str = tb.value("quantity", std::string("1"));
-    char mass_buf[32]{};
-    std::snprintf(mass_buf, sizeof(mass_buf), "%.2f kg", mass_kg);
+    auto metadata = create("metadata", 315, top, {6.5, 6.5, 6.5, 6.5, 12, 12}, {28, 10, 9, 9});
+    merge(metadata, 1, 1, 6, 1);
+    merge(metadata, 1, 2, 4, 2);
+    merge(metadata, 1, 4, 6, 4);
+    write(metadata, 1, 1, tb.value("material", std::string()));
+    write(metadata, 1, 2, "阶段标记", 3.0);
+    write(metadata, 5, 2, "重量", 3.0);
+    write(metadata, 6, 2, "比例", 3.0);
+    write(metadata, 5, 3, mass_text, 2.5);
+    write(metadata, 6, 3, tb.value("scale", std::string(default_scale)), 3.0);
+    write(metadata, 1, 4, "共1张  第1张", 3.0);
 
-    if (tst == PRO_TK_NO_ERROR) {
-        // Merge Part Title across rows 1..2 in column 6
-        ProDwgtableCellsMerge(&tbl, 6, 1, 6, 2, PRO_B_FALSE);
-
-        // Row 1 (Y=34..42): 设计 | (空) | 日期 | (空) | 材料 | <图名>
-        style_table_cell(&tbl, 1, 1, "设计", 3.2, sc, font_name);
-        style_table_cell(&tbl, 3, 1, "日期", 3.2, sc, font_name);
-        style_table_cell(&tbl, 5, 1, "材料", 3.2, sc, font_name);
-        style_table_cell(&tbl, 6, 1, part_title, 5.5, sc, font_name);
-
-        // Row 2 (Y=26..34): 审核 | (空) | 日期 | (空) | 45 | (merged)
-        style_table_cell(&tbl, 1, 2, "审核", 3.2, sc, font_name);
-        style_table_cell(&tbl, 3, 2, "日期", 3.2, sc, font_name);
-        style_table_cell(&tbl, 5, 2, material, 3.5, sc, font_name);
-
-        // Row 3 (Y=18..26): 比例 | 1:1 | 重量 | 3.24 kg | 件数 1 | <图号>
-        style_table_cell(&tbl, 1, 3, "比例", 3.2, sc, font_name);
-        style_table_cell(&tbl, 2, 3, scale_str, 3.4, sc, font_name);
-        style_table_cell(&tbl, 3, 3, "重量", 3.2, sc, font_name);
-        style_table_cell(&tbl, 4, 3, mass_buf, 3.0, sc, font_name);
-        style_table_cell(&tbl, 5, 3, "件数 " + qty_str, 3.0, sc, font_name);
-        style_table_cell(&tbl, 6, 3, dwg_no, 4.2, sc, font_name);
-
-        // Row 4 (Y=10..18): 图幅 | A3 | 共1张 | 第1张 | (第一角符号) | (单位栏留空)
-        style_table_cell(&tbl, 1, 4, "图幅", 3.2, sc, font_name);
-        style_table_cell(&tbl, 2, 4, "A3", 3.4, sc, font_name);
-        style_table_cell(&tbl, 3, 4, "共1张", 2.9, sc, font_name);
-        style_table_cell(&tbl, 4, 4, "第1张", 2.9, sc, font_name);
-        // Col 5, Row 4 holds the GB/T first-angle projection symbol (drawn below)
-        // Col 6, Row 4 is left empty for user/organization name
-
-        ProDwgtableDisplay(&tbl);
+    const std::string quantity = tb.value("quantity", std::string());
+    if (!quantity.empty()) {
+        add_note_mm(drw, sc, nullptr, 318, 40, {"件数 " + quantity}, 3.0,
+                    font_name, PRO_HORZJUST_LEFT, PRO_VERTJUST_BOTTOM);
     }
 
-    // Thick 0.70 mm outer border around the title block per GB/T 10609.1
-    draw_line_mm(drw, sc, nullptr, tb_x0, 10.0, tb_x0, tb_y1, 0.70);
-    draw_line_mm(drw, sc, nullptr, tb_x0, tb_y1, 410.0, tb_y1, 0.70);
-    // Bold vertical divider before part title/drawing no column (X = 358)
-    draw_line_mm(drw, sc, nullptr, 358.0, 10.0, 358.0, tb_y1, 0.50);
+    auto identity = create("identity", 365, top, {50}, {17, 18, 12, 9});
+    write(identity, 1, 1, tb.value("organization", std::string()));
+    write(identity, 1, 2, tb.value("part_title", std::string("零件图")), 5.0);
+    write(identity, 1, 3, tb.value("drawing_no", std::string("DWG-001")), 4.0);
+    draw_gb_first_angle_symbol(drw, sc, 390, 9.5);
 
-    // Draw GB/T first-angle projection symbol inside Col 5, Row 4 (X=338..358, Y=10..18 -> center 348, 14)
-    draw_gb_first_angle_symbol(drw, sc, 348.0, 14.0);
+    line(left, bottom, left, top);
+    line(left, top, right, top);
+    line(315, bottom, 315, top);
+    line(365, bottom, 365, top);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1403,7 +1399,7 @@ inline ProError run_drawing_build_stage2() {
     SheetCoord sc;
     sc.init(drw, 1, log);
 
-    // 6. Draw GB/T 14689 A3 frame, center marks & simplified Chinese title block
+    // 6. Draw the GB/T A3 binding frame, center marks and title block
     draw_gb_a3_frame_and_titleblock(drw, sc, plan, mass_kg, font_name, log);
 
     // Collect solid surfaces once for geometric queries

@@ -699,13 +699,28 @@ def build_and_verify_drawing_plan(
 
 
 def export_clean_deliverable(plan_path: Path, src_dir: Path, deliverable_dir: Path) -> None:
-    """Export a flat deliverable package containing only CAD binaries and preview JPGs."""
+    """Export a flat deliverable package containing CAD binaries, drawings, and preview images."""
     plan_data = json.loads(plan_path.read_text(encoding="utf-8"))
-    part_name = str(plan_data["part_name"])
-    doc_type = str(plan_data.get("doc_type", "part"))
     if deliverable_dir.exists():
         shutil.rmtree(deliverable_dir)
     deliverable_dir.mkdir(parents=True)
+    if is_drawing_plan(plan_data):
+        drw_name = str(plan_data["drawing_name"])
+        model_name = str(plan_data["model_name"])
+        for fn in (
+            f"{drw_name}.drw.1",
+            f"{model_name}.prt.1",
+            f"{drw_name}.pdf",
+            f"{drw_name}.dwg",
+            f"{drw_name}_preview.png",
+        ):
+            src = src_dir / fn
+            if src.is_file():
+                shutil.copy2(src, deliverable_dir / fn)
+        print(f"[deliverable] Flat drawing deliverable package written to: {deliverable_dir}")
+        return
+    part_name = str(plan_data["part_name"])
+    doc_type = str(plan_data.get("doc_type", "part"))
     if doc_type == "assembly":
         asm_src = src_dir / f"{part_name}.asm.1"
         if asm_src.is_file():

@@ -4,7 +4,7 @@
  *
  * Generates native associative Creo drawings (.drw) with:
  *   - GB/T 14689-2008 A3 (420x297 mm) binding frame (a=25, c=5), center marks
- *   - Simplified academic/course-design GB/T Chinese title block (ProDwgtable + 1st-angle symbol)
+ *   - GB/T 10609.1-2008 Appendix A 180x56 mm Chinese title block (ProDwgtable + 1st-angle symbol)
  *   - First-angle orthographic views, planar full cross-sections, vertical broken views,
  *     and circular enlarged detail views (2:1)
  *   - Associative model dimensions (linear, diameter, radius) with ISO/GB fit tolerances
@@ -483,7 +483,7 @@ inline void style_table_cell(
     ProVerticalJustification vjust = PRO_VERTJUST_MIDDLE
 ) {
     if (!text_utf8.empty()) {
-        std::wstring ws = utf8_to_w(text_utf8);
+        std::wstring ws = creo_encode_symbols(utf8_to_w(text_utf8));
         ProWstring *lines = nullptr;
         ProArrayAlloc(1, sizeof(ProWstring), 1, reinterpret_cast<ProArray *>(&lines));
         lines[0] = const_cast<wchar_t *>(ws.c_str());
@@ -573,14 +573,20 @@ inline void draw_gb_a3_frame_and_titleblock(
     };
     const Json tb = plan.value("title_block", Json::object());
     const double sheet_scale = plan.value("sheet_scale", 1.0);
-    char default_scale[32]{};
+    std::string default_scale = "1:1";
     if (sheet_scale >= 1.0) {
-        std::snprintf(default_scale, sizeof(default_scale), "%.6g:1", sheet_scale);
+        char buf[32]{};
+        std::snprintf(buf, sizeof(buf), "%.6g:1", sheet_scale);
+        default_scale = buf;
     } else if (sheet_scale > 0.0) {
-        std::snprintf(default_scale, sizeof(default_scale), "1:%.6g", 1.0 / sheet_scale);
+        char buf[32]{};
+        std::snprintf(buf, sizeof(buf), "1:%.6g", 1.0 / sheet_scale);
+        default_scale = buf;
     }
+    std::string scale_str = tb.value("scale", std::string());
+    if (scale_str.empty()) scale_str = default_scale;
     char mass_text[32]{};
-    std::snprintf(mass_text, sizeof(mass_text), "%.2f", mass_kg);
+    std::snprintf(mass_text, sizeof(mass_text), "%.2f", std::max(0.0, mass_kg));
     auto write = [&](ProDwgtable &table, int col, int row, const std::string &value, double height = 3.5) {
         style_table_cell(&table, col, row, value, height, sc, font_name);
     };
@@ -595,6 +601,7 @@ inline void draw_gb_a3_frame_and_titleblock(
     write(revisions, 4, 4, "更改文件号", 2.5);
     write(revisions, 5, 4, "签名", 2.5);
     write(revisions, 6, 4, "年 月 日", 2.5);
+    ProDwgtableDisplay(&revisions);
 
     auto signatures = create("signatures", left, 33, {12, 12, 21, 13, 9, 13}, {7, 7, 7, 7});
     write(signatures, 1, 1, "设计", 3.0);
@@ -604,6 +611,7 @@ inline void draw_gb_a3_frame_and_titleblock(
     write(signatures, 1, 3, "审核", 3.0);
     write(signatures, 1, 4, "工艺", 3.0);
     write(signatures, 4, 4, "批准", 3.0);
+    ProDwgtableDisplay(&signatures);
 
     auto metadata = create("metadata", 315, top, {6.5, 6.5, 6.5, 6.5, 12, 12}, {28, 10, 9, 9});
     merge(metadata, 1, 1, 6, 1);
@@ -614,19 +622,21 @@ inline void draw_gb_a3_frame_and_titleblock(
     write(metadata, 5, 2, "重量", 3.0);
     write(metadata, 6, 2, "比例", 3.0);
     write(metadata, 5, 3, mass_text, 2.5);
-    write(metadata, 6, 3, tb.value("scale", std::string(default_scale)), 3.0);
+    write(metadata, 6, 3, scale_str, 3.0);
     write(metadata, 1, 4, "共1张  第1张", 3.0);
+    ProDwgtableDisplay(&metadata);
 
     const std::string quantity = tb.value("quantity", std::string());
     if (!quantity.empty()) {
-        add_note_mm(drw, sc, nullptr, 318, 40, {"件数 " + quantity}, 3.0,
-                    font_name, PRO_HORZJUST_LEFT, PRO_VERTJUST_BOTTOM);
+        add_note_mm(drw, sc, nullptr, 340.0, 35.0, {"件数 " + quantity}, 2.6,
+                    font_name, PRO_HORZJUST_CENTER, PRO_VERTJUST_BOTTOM);
     }
 
     auto identity = create("identity", 365, top, {50}, {17, 18, 12, 9});
     write(identity, 1, 1, tb.value("organization", std::string()));
     write(identity, 1, 2, tb.value("part_title", std::string("零件图")), 5.0);
     write(identity, 1, 3, tb.value("drawing_no", std::string("DWG-001")), 4.0);
+    ProDwgtableDisplay(&identity);
     draw_gb_first_angle_symbol(drw, sc, 390, 9.5);
 
     line(left, bottom, left, top);
@@ -1875,8 +1885,8 @@ inline ProError run_drawing_build_stage2() {
     // 10. GB/T Surface Roughness Marks
     if (plan.contains("roughness_rest")) {
         std::string rrest = plan["roughness_rest"].get<std::string>();
-        double rx = plan.value("roughness_rest_x", 374.0);
-        double ry = plan.value("roughness_rest_y", 272.0);
+        double rx = plan.value("roughness_rest_x", 384.0);
+        double ry = plan.value("roughness_rest_y", 276.0);
         add_note_mm(drw, sc, nullptr, rx - 11.5, ry + 1.0, {"其余"}, 3.5, font_name, PRO_HORZJUST_LEFT, PRO_VERTJUST_BOTTOM);
         draw_gb_ra_mark(drw, sc, nullptr, rx + 2.0, ry, rrest, "up", false, font_name, 8.0, false);
     }

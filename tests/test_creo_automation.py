@@ -336,6 +336,38 @@ class TestHumanUiAndStageHelpers(unittest.TestCase):
             self.assertIn("default_font chfntf", txt)
             self.assertIn("symbol_font LEGACY", txt)
 
+    def test_export_clean_deliverable_for_drawing_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            plan_path = root / "dwg_sample.json"
+            plan_path.write_text(
+                json.dumps(
+                    {
+                        "doc_type": "drawing",
+                        "model_name": "sample_part",
+                        "drawing_name": "sample_dwg",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            src_dir = root / "src"
+            src_dir.mkdir()
+            for fn in (
+                "sample_dwg.drw.1",
+                "sample_part.prt.1",
+                "sample_dwg.pdf",
+                "sample_dwg.dwg",
+                "build_report.txt",
+            ):
+                (src_dir / fn).write_bytes(b"ok")
+            deliv_dir = root / "deliv"
+            build_cpp.export_clean_deliverable(plan_path, src_dir, deliv_dir)
+            copied = sorted(p.name for p in deliv_dir.iterdir())
+            self.assertEqual(
+                copied,
+                ["sample_dwg.drw.1", "sample_dwg.dwg", "sample_dwg.pdf", "sample_part.prt.1"],
+            )
+
     def test_install_skill_globally_installs_all_skills(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             installed = creobuild_setup.install_skill_globally("antigravity", home=Path(td))
